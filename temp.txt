@@ -1,0 +1,4 @@
+P: "ActiveAnimStackName", "KString", "", "", ""
+PropertyTemplate: "FbxAnimStack" {
+AnimationStack: 1613691528752, "AnimStack::Take 001", "" {
+;AnimLayer::BaseLayer, AnimStack::Take 001

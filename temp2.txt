@@ -1,0 +1,14 @@
+592:                        // Draw spinning hazard outline dashed circle
+736:            // Draw active red laser beams when Boss or Big Zombies are in 'dash' state
+737:            if (z.type === 'zombie_boss' && (z as any).bossAttackState === 'dash') {
+765:            if (z.type === 'zombie_big' && (z as any).bigAttackState === 'dash') {
+881:                const isInvincibleOrSpecial = (bossState === 'warning' || bossState === 'dash' || bossState === 'earthquake_leap' || ((z as any).introZ !== undefined && (z as any).introZ > 0));
+1266:            // Draw hemispherical shield / shockwave facing the dash direction during dash state, or when spin is 5 or more
+1268:            if ((top.state === 'dash' || isShieldSpinActive) && top.hp > 0) {
+1271:                if (top.state === 'dash') {
+1272:                    dx = top.dashDirectionX ?? 0;
+1273:                    dy = top.dashDirectionY ?? 0;
+1279:                const dashAngle = speed > 5 ? Math.atan2(dy, dx) : (top.angle ?? 0);
+1282:                ctx.rotate(dashAngle);
+1284:                const progress = top.state === 'dash' 
+1285:                    ? Math.max(0, Math.min(1, 1.0 - ((top.dashTimer ?? 0.5) / (top.maxDashDuration || 1.0)))) 

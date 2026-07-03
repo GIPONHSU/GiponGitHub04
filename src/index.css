@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.hide-cursor {
+  cursor: none !important;
+}
+
+body.show-cursor {
+  cursor: auto !important;
+}
+
+* {
+  user-select: none;
+}

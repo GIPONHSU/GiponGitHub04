@@ -1,0 +1,215 @@
+734-                    dashDirectionY: 0,
+735-                    modelType: this.modelTypes[i] || 1
+736-                });
+737-
+738-                EffectSystem.addParticles(this, startPos[i].x, startPos[i].y, PLAYER_PROFILES[i].color, 40, 300, 10);
+739:                this.shockwaves.push({
+740-                    x: startPos[i].x,
+741-                    y: startPos[i].y,
+742-                    radius: 10,
+743-                    maxRadius: 150,
+744-                    speed: 400,
+--
+868-                        const ex = 100 + Math.random() * (CANVAS_W - 200);
+869-                        const ey = cy - 440 + Math.random() * 880;
+870-                        
+871-                        EffectSystem.addParticles(this, ex, ey, '#ff5511', 25, 260, 9);
+872-                        EffectSystem.addParticles(this, ex, ey, '#ffdd33', 15, 200, 6);
+873:                        this.shockwaves.push({
+874-                            x: ex,
+875-                            y: ey,
+876-                            radius: 10,
+877-                            maxRadius: 180 + Math.random() * 120,
+878-                            speed: 500,
+--
+1075-                        const originalIndex = parseInt(top.id.split('_')[1], 10);
+1076-                        const startPos = localCornerPos[originalIndex] || localCornerPos[0];
+1077-                        (top as any).introShake = 0;
+1078-                        
+1079-                        // Strong Launch Effect
+1080:                        this.shockwaves.push({
+1081-                            x: startPos.x,
+1082-                            y: startPos.y,
+1083-                            radius: 10,
+1084-                            maxRadius: 300,
+1085-                            speed: 800,
+--
+1158-                    this.screenShakeTimer = 1.2;
+1159-                    SoundSystem.play('jump');
+1160-
+1161-                    this.tops.forEach(top => {
+1162-                        top.introZ = 0;
+1163:                        this.shockwaves.push({
+1164-                            x: top.x,
+1165-                            y: top.y,
+1166-                            radius: 10,
+1167-                            maxRadius: 280,
+1168-                            speed: 600,
+--
+1220-
+1221-                    if (boss) {
+1222-                        (boss as any).introZ = 0;
+1223-
+1224-                        // Create huge epicenter slam landing shockwave
+1225:                        this.shockwaves.push({
+1226-                            x: boss.x,
+1227-                            y: boss.y,
+1228-                            radius: 10,
+1229-                            maxRadius: 480,
+1230-                            speed: 850,
+--
+1300-                        isMultiplayer: true,
+1301-                        lifeTimer: 15
+1302-                    });
+1303-
+1304-                    // Trigger giant Gold/Yellow expanding circular light shockwave
+1305:                    this.shockwaves.push({
+1306-                        x: 960,
+1307-                        y: cy,
+1308-                        radius: 10,
+1309-                        maxRadius: 380,
+1310-                        speed: 600,
+--
+1388-                            chosen.arrowAngle = Math.PI * 0.75;
+1389-                        }
+1390-                        this.activeLaunchPads = [chosen];
+1391-
+1392-                        // Trigger a beautiful expanding rainbow circular light effect at spawn location!
+1393:                        this.shockwaves.push({
+1394-                            x: chosen.x,
+1395-                            y: chosen.y,
+1396-                            radius: 10,
+1397-                            maxRadius: 280,
+1398-                            speed: 550,
+--
+1576-                            const owner = this.tops.find(t => t.id === pc.ownerId);
+1577-                            if (owner) {
+1578-                                owner.kills = (owner.kills ?? 0) + 1;
+1579-                            }
+1580-
+1581:                            this.shockwaves.push({
+1582-                                x: z.x,
+1583-                                y: z.y,
+1584-                                radius: 0,
+1585-                                maxRadius: isBoss ? 450 : (isBig ? 250 : 150),
+1586-                                speed: isBoss ? 800 : (isBig ? 600 : 500),
+--
+1704-                                            SoundSystem.play('Mech_Move_011');
+1705-                                        }
+1706-                                        EffectSystem.addParticles(this, t.x, t.y, '#ffffff', 30, 200, 8);
+1707-                                    });
+1708-
+1709:                                    this.shockwaves.push({
+1710-                                        x: pad.x,
+1711-                                        y: pad.y,
+1712-                                        radius: 10,
+1713-                                        maxRadius: 320,
+1714-                                        speed: 800,
+--
+1745-                                // Immediately cancel active zombie siege, scattering the zombies and turning them into standard zombies
+1746-                                if (this.zombieSiegeActive && this.siegeTargetPlayerId === top.id) {
+1747-                                    EventSystem.cancelZombieSiege(this);
+1748-                                }
+1749-                                
+1750:                                this.shockwaves.push({
+1751-                                    x: pad.x,
+1752-                                    y: pad.y,
+1753-                                    radius: 5,
+1754-                                    maxRadius: 120,
+1755-                                    speed: 600,
+--
+1904-                        (top as any).launchPadNextAiSpinTime = undefined;
+1905-                        
+1906-                        // Visual transition shockwave color depending on speed tier (fast=red, medium=yellow/orange, slow=cyan)
+1907-                        const runSpeed = (top as any).launchPadSpeedTier;
+1908-                        const col = runSpeed === 'fast' ? '#ef4444' : (runSpeed === 'medium' ? '#f59e0b' : '#38bdf8');
+1909:                        this.shockwaves.push({
+1910-                            x: top.x,
+1911-                            y: top.y,
+1912-                            radius: 10,
+1913-                            maxRadius: 180,
+1914-                            speed: 700,
+--
+2018-
+2019-                            const targetDir = GameUtils.findLaunchPadNearestTargetDir(this, top);
+2020-                            (top as any).launchPadDirX = targetDir.x;
+2021-                            (top as any).launchPadDirY = targetDir.y;
+2022-
+2023:                            this.shockwaves.push({
+2024-                                x: top.x,
+2025-                                y: top.y,
+2026-                                radius: 10,
+2027-                                maxRadius: 360,
+2028-                                speed: 1200,
+--
+2133-                            this.screenShakeIntensity = 12;
+2134-                            EffectSystem.addParticles(this, top.x, top.y, '#ffffff', 28, 480, 7);
+2135-                            EffectSystem.addParticles(this, top.x, top.y, '#22d3ee', 24, 380, 6);
+2136-                            EffectSystem.addParticles(this, top.x, top.y, top.color, 28, 420, 7);
+2137-
+2138:                            this.shockwaves.push({
+2139-                                x: top.x,
+2140-                                y: top.y,
+2141-                                radius: 10,
+2142-                                maxRadius: 220,
+2143-                                speed: 900,
+--
+2233-                            top.standbyCenterY = top.standbyCenterY ?? startPos[coinSlotIdx].y;
+2234-                            top.standbyAngle = Math.random() * Math.PI * 2;
+2235-                            top.standbyCenterVx = 0;
+2236-                            top.standbyCenterVy = 0;
+2237-
+2238:                            this.shockwaves.push({
+2239-                                x: top.x,
+2240-                                y: top.y,
+2241-                                radius: 10,
+2242-                                maxRadius: 240,
+2243-                                speed: 1000,
+--
+2253-
+2254-                            const targetDir = GameUtils.findLaunchPadNearestTargetDir(this, top);
+2255-                            (top as any).launchPadDirX = targetDir.x;
+2256-                            (top as any).launchPadDirY = targetDir.y;
+2257-
+2258:                            this.shockwaves.push({
+2259-                                x: top.x,
+2260-                                y: top.y,
+2261-                                radius: 10,
+2262-                                maxRadius: 360,
+2263-                                speed: 1200,
+--
+2582-                                const playerIdx = matchIdx ? parseInt(matchIdx[0], 10) : 0;
+2583-                                this.spawnTicket(z.x, z.y, z.type, playerIdx);
+2584-                                top.kills = (top.kills ?? 0) + 1;
+2585-
+2586-                                // Small flashy energy wave
+2587:                                this.shockwaves.push({
+2588-                                    x: z.x,
+2589-                                    y: z.y,
+2590-                                    radius: 0,
+2591-                                    maxRadius: z.type === 'zombie_boss' ? 400 : 120,
+2592-                                    speed: 450,
+--
+3521-                
+3522-                if (top.zPos <= 0) {
+3523-                    top.zPos = 0;
+3524-                    top.zVel = 0;
+3525-                    // Heavy slam impact
+3526:                    this.shockwaves.push({
+3527-                        x: top.x,
+3528-                        y: top.y,
+3529-                        radius: 5,
+3530-                        maxRadius: 200,
+3531-                        speed: 500,
+--
+3671-                                this.spawnTicket(z.x, z.y, z.type, idx);
+3672-                            }
+3673-                            top.kills = (top.kills ?? 0) + 1;
+3674-
+3675-                            // 觸發殭屍死亡時的擴大膨脹衝擊波
+3676:                            this.shockwaves.push({
+3677-                                x: z.x,
+3678-                                y: z.y,
+3679-                                radius: 0,
+3680-                                maxRadius: isBoss ? 450 : (isBig ? 250 : 150),
+3681-                                speed: isBoss ? 800 : (isBig ? 600 : 500),
