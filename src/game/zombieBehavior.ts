@@ -170,10 +170,13 @@ export function updateZombies(
         z.markForDeletion = true;
         
         // Spawn tickets now that the dying animation is complete
-        const killerId = (z as any).lastKillerId || "";
-        const match = killerId.match(/\d+/);
-        const playerIdx = match ? parseInt(match[0], 10) : 0;
-        this.spawnTicket(z.x, z.y, z.type, playerIdx);
+        if (!(z as any).ticketsSpawned) {
+          (z as any).ticketsSpawned = true;
+          const killerId = (z as any).lastKillerId || "";
+          const match = killerId.match(/\d+/);
+          const playerIdx = match ? parseInt(match[0], 10) : 0;
+          this.spawnTicket(z.x, z.y, z.type, playerIdx);
+        }
 
         // Particle colors
         let mainColor = "#22c55e";

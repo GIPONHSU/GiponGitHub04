@@ -231,6 +231,7 @@ export interface FloatingText {
     maxLife: number;
     vy: number;
     scale?: number;
+    style?: string;
 }
 
 export interface Particle {
@@ -287,6 +288,37 @@ export interface Projectile {
     trail?: { x: number; y: number }[];
     hitIds?: string[];
     isBombBeam?: boolean;
+}
+
+export interface BulletTop {
+    id: string;
+    type?: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    radius: number;
+    mass: number;
+    life: number;
+    maxLife: number;
+    angle: number;
+    spin: number;
+    distanceMoved?: number;
+    lastSparkDist?: number;
+    markForDeletion?: boolean;
+    hitCooldowns: Map<string, number>;
+    trail?: { x: number; y: number }[];
+    speed?: number;
+    ownerPlayerId?: string;
+    stuckTimer?: number;
+    lastX?: number;
+    lastY?: number;
+    isSpiraling?: boolean;
+    spiralCenterX?: number;
+    spiralCenterY?: number;
+    spiralStartAngle?: number;
+    spiralTimer?: number;
+    spiralDir?: number;
 }
 
 export interface PhantomClone {

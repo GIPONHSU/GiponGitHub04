@@ -336,10 +336,11 @@ export function resolveCircleBoxCollision(circle: { x: number, y: number, vx: nu
     const oldVy = circle.vy;
 
     // Bounce calculation (amplitude enhanced 1.1x for a pleasant smooth feel)
-    const impulse = -(1 + bounciness) * velAlongNormal * circle.mass * 1.1;
+    const circleMass = circle.mass || 1.0;
+    const impulse = -(1 + bounciness) * velAlongNormal * circleMass * 1.1;
     
-    circle.vx += (impulse / circle.mass) * nx;
-    circle.vy += (impulse / circle.mass) * ny;
+    circle.vx += (impulse / circleMass) * nx;
+    circle.vy += (impulse / circleMass) * ny;
     
     // Forcefully deflect circle if it is a top, to avoid perfect retracing
     if (circle.type === 'top') {
@@ -460,9 +461,10 @@ export function resolveCircleTriangleCollision(
     const oldVy = circle.vy;
     
     // Bounce impulse
-    const impulse = -(1 + bounciness) * velAlongNormal * circle.mass * 1.1;
-    circle.vx += (impulse / circle.mass) * nx;
-    circle.vy += (impulse / circle.mass) * ny;
+    const circleMass = circle.mass || 1.0;
+    const impulse = -(1 + bounciness) * velAlongNormal * circleMass * 1.1;
+    circle.vx += (impulse / circleMass) * nx;
+    circle.vy += (impulse / circleMass) * ny;
     
     // Forcefully deflect circle if it is a top, to avoid perfect retracing
     if (circle.type === 'top') {

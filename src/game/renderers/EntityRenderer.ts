@@ -2811,4 +2811,113 @@ export function drawEntities(
     ctx.fillText("分身幻影", pc.x, pc.y - pc.radius - 30);
     ctx.restore();
   });
+
+  // Draw BulletTops Trail
+  engine.bulletTops.forEach((bt) => {
+    if (bt.trail && bt.trail.length > 1) {
+      ctx.save();
+      
+      // Use screen composition for premium additive neon glowing effects
+      ctx.globalCompositeOperation = "screen";
+
+      // 1. Draw glowing outer rainbow aura trail
+      const rainbowColors = [
+        "rgba(255, 0, 0, ",
+        "rgba(255, 127, 0, ",
+        "rgba(255, 255, 0, ",
+        "rgba(0, 255, 0, ",
+        "rgba(0, 0, 255, ",
+        "rgba(139, 0, 255, "
+      ];
+      for (let i = 0; i < bt.trail.length - 1; i++) {
+        const p1 = bt.trail[i];
+        const p2 = bt.trail[i + 1];
+        
+        const ratio = i / (bt.trail.length - 1); // 0.0 (oldest) to 1.0 (newest)
+        const opacity = ratio * 0.65; // fades out towards oldest points
+        const thickness = ratio * bt.radius * 0.75; // tapers down towards tail
+        
+        ctx.strokeStyle = rainbowColors[i % rainbowColors.length] + opacity + ")";
+        ctx.lineWidth = Math.max(4, thickness);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+
+      // 2. Draw a bright white-hot center line for the axis trail
+      for (let i = 0; i < bt.trail.length - 1; i++) {
+        const p1 = bt.trail[i];
+        const p2 = bt.trail[i + 1];
+        
+        const ratio = i / (bt.trail.length - 1);
+        const opacity = ratio * 0.9;
+        const thickness = ratio * bt.radius * 0.22; // much thinner white-hot core
+        
+        ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.lineWidth = Math.max(2, thickness);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+  });
+
+  // Draw BulletTops
+  engine.bulletTops.forEach((bt) => {
+    ctx.save();
+    ctx.translate(bt.x, bt.y);
+    ctx.rotate(bt.angle);
+
+    // Draw a small cross-shaped top with rainbow colors
+    const r = bt.radius;
+    
+    // Outer shadow
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 10;
+    
+    // Cross shape (4 prongs)
+    ctx.beginPath();
+    for(let i=0; i<4; i++) {
+        ctx.rotate(Math.PI / 2);
+        ctx.moveTo(-r * 0.2, 0);
+        ctx.lineTo(-r * 0.2, -r);
+        ctx.lineTo(r * 0.2, -r);
+        ctx.lineTo(r * 0.2, 0);
+    }
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    
+    // Rainbow gradients for the prongs
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    grad.addColorStop(0, "rgba(255, 0, 0, 0.8)");
+    grad.addColorStop(0.2, "rgba(255, 127, 0, 0.8)");
+    grad.addColorStop(0.4, "rgba(255, 255, 0, 0.8)");
+    grad.addColorStop(0.6, "rgba(0, 255, 0, 0.8)");
+    grad.addColorStop(0.8, "rgba(0, 0, 255, 0.8)");
+    grad.addColorStop(1, "rgba(139, 0, 255, 0.8)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Center pivot
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = "#333333";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+  });
 }

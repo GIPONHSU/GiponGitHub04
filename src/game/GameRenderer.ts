@@ -117,17 +117,38 @@ export class GameRenderer {
                 engine.floatingTexts.forEach(ft => {
                     this.ctx.save();
                     this.ctx.translate(ft.x, ft.y);
-                    const alpha = Math.max(0, Math.min(1, ft.life / ft.maxLife));
+                    let alpha = Math.max(0, Math.min(1, ft.life / ft.maxLife));
+                    if (ft.style === "armed_acquired") {
+                        alpha = ft.life > 0.2 ? 1.0 : Math.max(0, Math.min(1, ft.life / 0.2));
+                    }
                     this.ctx.globalAlpha = alpha;
                     if (ft.scale) this.ctx.scale(ft.scale, ft.scale);
-                    this.ctx.fillStyle = ft.color;
-                    this.ctx.font = 'bold 36px sans-serif';
+                    
+                    if (ft.style === "armed_acquired") {
+                        this.ctx.font = 'italic bold 48px "Microsoft JhengHei", "Courier New"';
+                        const sweepProgress = Math.min(1.0, (ft.maxLife - ft.life) / 0.6);
+                        const sheenCenter = -180 + sweepProgress * 360;
+                        const grad = this.ctx.createLinearGradient(sheenCenter - 50, 0, sheenCenter + 50, 0);
+                        grad.addColorStop(0, "#fbbf24");
+                        grad.addColorStop(0.35, "#fbbf24");
+                        grad.addColorStop(0.5, "#ffffff");
+                        grad.addColorStop(0.65, "#fbbf24");
+                        grad.addColorStop(1, "#fbbf24");
+                        
+                        this.ctx.fillStyle = grad;
+                        this.ctx.strokeStyle = "#000000";
+                        this.ctx.lineWidth = 4;
+                    } else {
+                        this.ctx.fillStyle = ft.color;
+                        this.ctx.font = 'bold 36px sans-serif';
+                        this.ctx.strokeStyle = 'black';
+                        this.ctx.lineWidth = 4;
+                    }
+                    
                     this.ctx.textAlign = 'center';
                     this.ctx.textBaseline = 'middle';
                     this.ctx.shadowColor = 'black';
                     this.ctx.shadowBlur = 4;
-                    this.ctx.lineWidth = 4;
-                    this.ctx.strokeStyle = 'black';
                     this.ctx.strokeText(ft.text, 0, 0);
                     this.ctx.fillText(ft.text, 0, 0);
                     this.ctx.restore();
@@ -162,17 +183,38 @@ export class GameRenderer {
                 engine.floatingTexts.forEach(ft => {
                     this.ctx.save();
                     this.ctx.translate(ft.x, ft.y);
-                    const alpha = Math.max(0, Math.min(1, ft.life / ft.maxLife));
+                    let alpha = Math.max(0, Math.min(1, ft.life / ft.maxLife));
+                    if (ft.style === "armed_acquired") {
+                        alpha = ft.life > 0.2 ? 1.0 : Math.max(0, Math.min(1, ft.life / 0.2));
+                    }
                     this.ctx.globalAlpha = alpha;
                     if (ft.scale) this.ctx.scale(ft.scale, ft.scale);
-                    this.ctx.fillStyle = ft.color;
-                    this.ctx.font = 'bold 36px sans-serif';
+                    
+                    if (ft.style === "armed_acquired") {
+                        this.ctx.font = 'italic bold 48px "Microsoft JhengHei", "Courier New"';
+                        const sweepProgress = Math.min(1.0, (ft.maxLife - ft.life) / 0.6);
+                        const sheenCenter = -180 + sweepProgress * 360;
+                        const grad = this.ctx.createLinearGradient(sheenCenter - 50, 0, sheenCenter + 50, 0);
+                        grad.addColorStop(0, "#fbbf24");
+                        grad.addColorStop(0.35, "#fbbf24");
+                        grad.addColorStop(0.5, "#ffffff");
+                        grad.addColorStop(0.65, "#fbbf24");
+                        grad.addColorStop(1, "#fbbf24");
+                        
+                        this.ctx.fillStyle = grad;
+                        this.ctx.strokeStyle = "#000000";
+                        this.ctx.lineWidth = 4;
+                    } else {
+                        this.ctx.fillStyle = ft.color;
+                        this.ctx.font = 'bold 36px sans-serif';
+                        this.ctx.strokeStyle = 'black';
+                        this.ctx.lineWidth = 4;
+                    }
+                    
                     this.ctx.textAlign = 'center';
                     this.ctx.textBaseline = 'middle';
                     this.ctx.shadowColor = 'black';
                     this.ctx.shadowBlur = 4;
-                    this.ctx.lineWidth = 4;
-                    this.ctx.strokeStyle = 'black';
                     this.ctx.strokeText(ft.text, 0, 0);
                     this.ctx.fillText(ft.text, 0, 0);
                     this.ctx.restore();

@@ -529,21 +529,41 @@ export function drawEffects(ctx: CanvasRenderingContext2D, engine: GameEngine, s
         engine.floatingTexts.forEach(ft => {
             ctx.save();
             ctx.translate(ft.x, ft.y);
-            const alpha = Math.max(0, Math.min(1, ft.life / ft.maxLife));
+            let alpha = Math.max(0, Math.min(1, ft.life / ft.maxLife));
+            if (ft.style === "armed_acquired") {
+                alpha = ft.life > 0.2 ? 1.0 : Math.max(0, Math.min(1, ft.life / 0.2));
+            }
             ctx.globalAlpha = alpha;
             if (ft.scale) {
                 ctx.scale(ft.scale, ft.scale);
             }
             
-            ctx.fillStyle = ft.color;
-            ctx.font = 'bold 36px sans-serif';
+            if (ft.style === "armed_acquired") {
+                ctx.font = 'italic bold 48px "Microsoft JhengHei", "Courier New"';
+                const sweepProgress = Math.min(1.0, (ft.maxLife - ft.life) / 0.6);
+                const sheenCenter = -180 + sweepProgress * 360;
+                const grad = ctx.createLinearGradient(sheenCenter - 50, 0, sheenCenter + 50, 0);
+                grad.addColorStop(0, "#fbbf24");
+                grad.addColorStop(0.35, "#fbbf24");
+                grad.addColorStop(0.5, "#ffffff");
+                grad.addColorStop(0.65, "#fbbf24");
+                grad.addColorStop(1, "#fbbf24");
+                
+                ctx.fillStyle = grad;
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 4;
+            } else {
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 36px sans-serif';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 4;
+            }
+            
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = 'black';
             ctx.strokeText(ft.text, 0, 0);
             ctx.fillText(ft.text, 0, 0);
             

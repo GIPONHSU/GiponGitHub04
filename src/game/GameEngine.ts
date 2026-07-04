@@ -1,6 +1,6 @@
 import { updateTopStandby, getStandbyRadiusForModel, getStandbyRadius } from './topMovement';
 import { updateZombies } from './zombieBehavior';
-import { Top, Zombie, Obstacle, Item, Particle, Entity, ConcreteBlock, Afterimage, PlayerStats, Projectile, PhantomClone } from './types';
+import { Top, Zombie, Obstacle, Item, Particle, Entity, ConcreteBlock, Afterimage, PlayerStats, Projectile, PhantomClone, BulletTop } from './types';
 import { GameRenderer } from './GameRenderer';
 import { resolveCollision, checkCollision, resolveCircleBoxCollision, resolveCircleTriangleCollision, checkCircleBoxCollision } from './physics';
 import { createTopSprite, createZombieSprite, createBarrelSprite, createCrateSprite, createZombieBossSprite } from './spriteLoader';
@@ -62,6 +62,7 @@ export class GameEngine {
     afterimages: Afterimage[] = [];
     projectiles: Projectile[] = [];
     phantomClones: PhantomClone[] = [];
+    bulletTops: BulletTop[] = [];
     shockwaves: { x: number; y: number; radius: number; maxRadius: number; speed: number; color: string; thickness: number; life: number; maxLife: number; isRainbow?: boolean; isDashedRed?: boolean }[] = [];
     slashLines: { x1: number; y1: number; x2: number; y2: number; life: number; maxLife: number; color: string; width: number }[] = [];
     xSlashes: { x: number; y: number; size: number; maxSize: number; speed: number; angle: number; life: number; maxLife: number; color: string; thickness: number }[] = [];
@@ -130,6 +131,7 @@ export class GameEngine {
 
     levelUpSlowMoTimer = 0;
     levelUpTargetTopId: string | null = null;
+    armedAcquiredSlowMoTimer = 0;
 
     areaCycle = 0;
     areaTransitionState: 'none' | 'exploding' | 'fade_in' = 'none';
@@ -867,9 +869,13 @@ export class GameEngine {
             if (this.levelUpSlowMoTimer > 0) {
                 this.levelUpSlowMoTimer = Math.max(0, this.levelUpSlowMoTimer - realDt);
                 let dt = realDt * 0.1; // 10% speed
-                this.update(dt);
+                this.update(dt, realDt);
+            } else if (this.armedAcquiredSlowMoTimer > 0) {
+                this.armedAcquiredSlowMoTimer = Math.max(0, this.armedAcquiredSlowMoTimer - realDt);
+                let dt = realDt * 0.05; // 5% speed (noticeable slow motion!)
+                this.update(dt, realDt);
             } else {
-                this.update(realDt);
+                this.update(realDt, realDt);
             }
         }
         this.renderer.render(this);
@@ -879,7 +885,469 @@ export class GameEngine {
         }
     }
     
-    update(dt: number) {
+    private updateBulletTops(dt: number, realDt: number = dt) {
+        this.bulletTops.forEach(bt => {
+            bt.life -= dt;
+            if (bt.life <= 0) {
+                bt.markForDeletion = true;
+                // Create spectacular rainbow shockwaves instead of particles
+                this.shockwaves.push({
+                    x: bt.x,
+                    y: bt.y,
+                    radius: 10,
+                    maxRadius: 320,
+                    speed: 900,
+                    color: 'rgba(168, 85, 247, 0.95)',
+                    thickness: 70,
+                    life: 0.4,
+                    maxLife: 0.4,
+                    isRainbow: true
+                });
+                this.shockwaves.push({
+                    x: bt.x,
+                    y: bt.y,
+                    radius: 10,
+                    maxRadius: 240,
+                    speed: 700,
+                    color: 'rgba(147, 51, 234, 0.9)',
+                    thickness: 50,
+                    life: 0.4,
+                    maxLife: 0.4,
+                    isRainbow: true
+                });
+                SoundSystem.play("SE-Explo1");
+                return;
+            }
+
+            if (bt.isSpiraling) {
+                bt.spiralTimer = (bt.spiralTimer || 0) + realDt;
+                const T = 0.8; // spiral duration
+                const progress = Math.min(1, bt.spiralTimer / T);
+                
+                const startAngle = bt.spiralStartAngle || 0;
+                const dir = bt.spiralDir || 1;
+                // Angle rotates by Math.PI * 3 (1.5 turns)
+                const currentAngle = startAngle + dir * progress * Math.PI * 3;
+                // Radius grows from 0 to 250px for a perfect Taiji spiral
+                const currentRadius = progress * 250;
+                
+                const cx = bt.spiralCenterX ?? bt.x;
+                const cy = bt.spiralCenterY ?? bt.y;
+                
+                const nextX = cx + Math.cos(currentAngle) * currentRadius;
+                const nextY = cy + Math.sin(currentAngle) * currentRadius;
+                
+                // Track velocity during spiral for trails and smooth transition
+                bt.vx = realDt > 0 ? (nextX - bt.x) / realDt : 0;
+                bt.vy = realDt > 0 ? (nextY - bt.y) / realDt : 0;
+                
+                bt.x = nextX;
+                bt.y = nextY;
+                
+                // Keep trail updated for trail rendering during spiral
+                if (!bt.trail) {
+                    bt.trail = [];
+                }
+                bt.trail.push({ x: bt.x, y: bt.y });
+                if (bt.trail.length > 20) {
+                    bt.trail.shift();
+                }
+
+                // Spin visual rotation
+                const visualSpinFactor = bt.spin / MAX_SPIN;
+                bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * realDt * 0.7;
+                
+                // If spiral is finished:
+                if (progress >= 1) {
+                    bt.isSpiraling = false;
+                    // We set their outward velocity to their speed
+                    const targetSpeed = bt.speed || 1200;
+                    bt.vx = Math.cos(currentAngle) * targetSpeed;
+                    bt.vy = Math.sin(currentAngle) * targetSpeed;
+                }
+                
+                // Skip further movement & bounce updates during spiral
+                bt.lastX = bt.x;
+                bt.lastY = bt.y;
+                return;
+            }
+
+            // Stuck detection (no displacement)
+            if (bt.lastX !== undefined && bt.lastY !== undefined) {
+                const distMoved = Math.hypot(bt.x - bt.lastX, bt.y - bt.lastY);
+                if (distMoved < 0.5) {
+                    bt.stuckTimer = (bt.stuckTimer || 0) + dt;
+                    if (bt.stuckTimer > 0.1) {
+                        bt.stuckTimer = 0;
+                        
+                        // Force move to another random boundary direction
+                        const centerY = this.activeArenaCenterY ?? 540;
+                        const leftCenterX = 540;
+                        const rightCenterX = 1380;
+                        const R = 480;
+
+                        const randWall = Math.floor(Math.random() * 4);
+                        let targetX = 960;
+                        let targetY = 540;
+
+                        if (randWall === 0) {
+                            targetX = leftCenterX + Math.random() * (rightCenterX - leftCenterX);
+                            targetY = centerY - R;
+                        } else if (randWall === 1) {
+                            targetX = leftCenterX + Math.random() * (rightCenterX - leftCenterX);
+                            targetY = centerY + R;
+                        } else if (randWall === 2) {
+                            const angle = Math.PI/2 + Math.random() * Math.PI;
+                            targetX = leftCenterX + Math.cos(angle) * R;
+                            targetY = centerY + Math.sin(angle) * R;
+                        } else {
+                            const angle = -Math.PI/2 + Math.random() * Math.PI;
+                            targetX = rightCenterX + Math.cos(angle) * R;
+                            targetY = centerY + Math.sin(angle) * R;
+                        }
+
+                        const dx = targetX - bt.x;
+                        const dy = targetY - bt.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist > 0) {
+                            const targetSpeed = bt.speed || 1200;
+                            bt.vx = (dx / dist) * targetSpeed;
+                            bt.vy = (dy / dist) * targetSpeed;
+                        }
+                    }
+                } else {
+                    bt.stuckTimer = 0;
+                }
+            } else {
+                bt.stuckTimer = 0;
+            }
+            bt.lastX = bt.x;
+            bt.lastY = bt.y;
+
+            // Update trail coordinates for trail renderers
+            if (!bt.trail) {
+                bt.trail = [];
+            }
+            bt.trail.push({ x: bt.x, y: bt.y });
+            if (bt.trail.length > 20) {
+                bt.trail.shift();
+            }
+
+            bt.distanceMoved = bt.distanceMoved || 0;
+            bt.lastSparkDist = bt.lastSparkDist || 0;
+            
+            const visualSpinFactor = bt.spin / MAX_SPIN;
+            bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
+
+            const distThisFrame = Math.hypot(bt.vx * dt, bt.vy * dt);
+            bt.distanceMoved += distThisFrame;
+
+            if (bt.distanceMoved - bt.lastSparkDist >= 100) {
+                bt.lastSparkDist = bt.distanceMoved;
+                EffectSystem.addParticles(this, bt.x, bt.y, "#ffff00", 1, 100, 3, true);
+            }
+
+            bt.x += bt.vx * dt;
+            bt.y += bt.vy * dt;
+
+            // Bounce on concrete blocks
+            this.concreteBlocks.forEach(block => {
+                if (!block.markForDeletion && checkCircleBoxCollision(bt as any, block)) {
+                    const oldVx = bt.vx;
+                    const oldVy = bt.vy;
+                    const res = resolveCircleBoxCollision(bt as any, block, 1.0);
+                    if (res) {
+                        const collisionX = bt.x - res.nx * bt.radius;
+                        const collisionY = bt.y - res.ny * bt.radius;
+                        EffectSystem.addChainsawSparkParticles(this, collisionX, collisionY, res.nx, res.ny, 18);
+                    }
+                    if (bt.vx !== oldVx || bt.vy !== oldVy) {
+                        this.redirectBulletTopToNearestElite(bt);
+                    }
+                }
+            });
+
+            // Bounce on other player tops (elastic collision rebound)
+            // BulletTops do not have HP and only self-destruct when their 15-second timer expires.
+            // Other tops will not suffer HP or spin reduction when colliding with BulletTops.
+            this.tops.forEach(top => {
+                if (top.markForDeletion || top.hp <= 0) return;
+
+                const dx = top.x - bt.x;
+                const dy = top.y - bt.y;
+                const dist = Math.hypot(dx, dy);
+                const minDist = bt.radius + top.radius;
+
+                if (dist < minDist && dist > 0) {
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+
+                    // Push apart to prevent overlap
+                    const overlap = minDist - dist;
+                    bt.x -= nx * overlap * 0.5;
+                    bt.y -= ny * overlap * 0.5;
+                    top.x += nx * overlap * 0.5;
+                    top.y += ny * overlap * 0.5;
+
+                    // Rebound velocities
+                    const rvx = top.vx - bt.vx;
+                    const rvy = top.vy - bt.vy;
+                    const velAlongNormal = rvx * nx + rvy * ny;
+
+                    if (velAlongNormal < 0) {
+                        const bounciness = 0.95;
+                        const impulseScalar = -(1 + bounciness) * velAlongNormal;
+                        const impulseX = impulseScalar * nx;
+                        const impulseY = impulseScalar * ny;
+
+                        bt.vx -= impulseX * 0.5;
+                        bt.vy -= impulseY * 0.5;
+                        top.vx += impulseX * 0.5;
+                        top.vy += impulseY * 0.5;
+
+                        // Sound & spark effects
+                        SoundSystem.play("Attack_Punch_024");
+                        const midX = (bt.x + top.x) / 2;
+                        const midY = (bt.y + top.y) / 2;
+                        EffectSystem.addParticles(this, midX, midY, top.color, 8, 160, 4);
+                        EffectSystem.addParticles(this, midX, midY, '#ffffff', 4, 200, 3);
+
+                        this.redirectBulletTopToNearestElite(bt);
+                    }
+                }
+            });
+
+            // Bounce on wall
+            const oldVx = bt.vx;
+            const oldVy = bt.vy;
+            const wallBounced = CollisionSystem.handleWallBounce(this, bt as any);
+            if (wallBounced || bt.vx !== oldVx || bt.vy !== oldVy) {
+                this.redirectBulletTopToNearestElite(bt);
+            }
+
+            // Collide with zombies (push and damage)
+            this.zombies.forEach(z => {
+                if (z.markForDeletion || z.hp <= 0 || (z as any).isSiegeZombie) return;
+                
+                const dx = z.x - bt.x;
+                const dy = z.y - bt.y;
+                const dist = Math.hypot(dx, dy);
+                const minDist = bt.radius + z.radius;
+
+                if (dist < minDist) {
+                    // check hit cooldown
+                    const lastHit = bt.hitCooldowns.get(z.id) || 0;
+                    if (this.timeElapsed - lastHit > 0.3) {
+                        bt.hitCooldowns.set(z.id, this.timeElapsed);
+                        
+                        // Push away
+                        const pushDist = minDist - dist;
+                        const pushX = (dx / dist) * pushDist;
+                        const pushY = (dy / dist) * pushDist;
+                        z.x += pushX;
+                        z.y += pushY;
+                        
+                        z.vx = (dx / dist) * 600;
+                        z.vy = (dy / dist) * 600;
+                        z.bounceTimer = 0.5;
+                        z.maxBounceTimer = 0.5;
+                        
+                        const angle = Math.atan2(z.y - bt.y, z.x - bt.x);
+                        const contactX = bt.x + Math.cos(angle) * bt.radius;
+                        const contactY = bt.y + Math.sin(angle) * bt.radius;
+
+                        // 3.「子彈陀螺」每次碰撞到敵人時，要額外乘以50%機率去決定該下碰撞傷害是否成立，若成立，才會進行敵人擊殺機率運算。
+                        if (Math.random() < 0.5) {
+                            const ownerId = bt.ownerPlayerId || "top_0";
+                            (z as any).lastKillerId = ownerId;
+                            
+                            // Apply 20 damage
+                            z.hp -= 20;
+
+                            // Apply damage to zombie (this runs hit count and instakill/enemy kill probability checks)
+                            GameUtils.applyDamageToZombie(this, z, 20, ownerId);
+                            
+                            z.flashTimer = 0.1;
+                            let mainColor = '#fbbf24'; // default
+                            if (z.type === 'zombie_boss') {
+                                mainColor = '#ea580c';
+                            } else if (z.type === 'zombie_big') {
+                                mainColor = '#9333ea';
+                            } else if (z.type === 'zombie_bomb') {
+                                mainColor = '#ef4444';
+                            } else if (z.type === 'zombie_golden') {
+                                mainColor = '#eab308';
+                            } else if (z.type === 'zombie_black') {
+                                mainColor = '#1f2937';
+                            } else if (z.type === 'zombie_bouncing') {
+                                mainColor = '#be185d';
+                            }
+                            EffectSystem.addParticles(this, contactX, contactY, mainColor, 8, 160, 4);
+                            EffectSystem.addParticles(this, contactX, contactY, '#ffffff', 4, 200, 3);
+                            SoundSystem.play("Attack_Punch_024");
+
+                            // Check if zombie is killed (hp <= 0)
+                            if (z.hp <= 0) {
+                                const isAlreadyDying = (z as any).isDying;
+                                if (!isAlreadyDying && !(z as any).ticketsSpawned) {
+                                    (z as any).ticketsSpawned = true;
+
+                                    const isBoss = z.type === 'zombie_boss';
+                                    const isBig = z.type === 'zombie_big' || z.type === 'zombie_bomb' || z.type === 'zombie_bouncing';
+
+                                    // spawn explosion
+                                    EffectSystem.spawnSkillKillExplosion(this, z.x, z.y, isBoss);
+
+                                    // score calculation
+                                    const points = isBoss ? 500 : (isBig ? 50 : 10);
+                                    const ownerMatch = ownerId.match(/\d+/);
+                                    const ownerIdx = ownerMatch ? parseInt(ownerMatch[0], 10) : 0;
+                                    this.addScore(ownerIdx, points);
+
+                                    // Spawn tickets immediately, belonging to the owner player's P-position
+                                    this.spawnTicket(z.x, z.y, z.type, ownerIdx);
+
+                                    // Update kill counts for the owner player
+                                    const ownerTop = this.tops.find(t => t.id === ownerId);
+                                    if (ownerTop) {
+                                        ownerTop.kills = (ownerTop.kills ?? 0) + 1;
+                                        const part = this.participants.find(p => p.id === ownerId);
+                                        if (part) {
+                                            part.kills = ownerTop.kills;
+                                        }
+                                    }
+
+                                    // Call handleZombieDeath to set dying state and trigger proper animations
+                                    if (GameUtils.handleZombieDeath(this, z, ownerId)) {
+                                        z.markForDeletion = true;
+                                    }
+                                }
+                            }
+                        } else {
+                            // Show minor sparks on missed damage/impact (50% fail)
+                            EffectSystem.addParticles(this, contactX, contactY, "#9ca3af", 3, 100, 3, true);
+                        }
+                    }
+                }
+            });
+
+            // 1. 保證「子彈陀螺」的移動速度在過程中都不會減弱
+            const speed = Math.hypot(bt.vx, bt.vy);
+            const targetSpeed = bt.speed || 1200;
+            if (speed > 0) {
+                bt.vx = (bt.vx / speed) * targetSpeed;
+                bt.vy = (bt.vy / speed) * targetSpeed;
+            } else {
+                const randomAngle = Math.random() * Math.PI * 2;
+                bt.vx = Math.cos(randomAngle) * targetSpeed;
+                bt.vy = Math.sin(randomAngle) * targetSpeed;
+            }
+        });
+
+        // 3. 讓多個「子彈陀螺」移動時可以彼此碰撞並發生反彈
+        for (let i = 0; i < this.bulletTops.length; i++) {
+            const bt1 = this.bulletTops[i];
+            if (bt1.markForDeletion) continue;
+            for (let j = i + 1; j < this.bulletTops.length; j++) {
+                const bt2 = this.bulletTops[j];
+                if (bt2.markForDeletion) continue;
+
+                const dx = bt2.x - bt1.x;
+                const dy = bt2.y - bt1.y;
+                const dist = Math.hypot(dx, dy);
+                const minDist = bt1.radius + bt2.radius;
+
+                if (dist < minDist && dist > 0) {
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+
+                    // Push apart to prevent overlap
+                    const overlap = minDist - dist;
+                    bt1.x -= nx * overlap * 0.5;
+                    bt1.y -= ny * overlap * 0.5;
+                    bt2.x += nx * overlap * 0.5;
+                    bt2.y += ny * overlap * 0.5;
+
+                    // Force them to fly apart in opposite directions along the normal
+                    const speed1 = bt1.speed || 1200;
+                    const speed2 = bt2.speed || 1200;
+
+                    bt1.vx = -nx * speed1;
+                    bt1.vy = -ny * speed1;
+                    bt2.vx = nx * speed2;
+                    bt2.vy = ny * speed2;
+
+                    // Sound & spark effects
+                    SoundSystem.play("Attack_Punch_024");
+                    const midX = (bt1.x + bt2.x) / 2;
+                    const midY = (bt1.y + bt2.y) / 2;
+                    const owner1 = this.tops.find(t => t.id === bt1.ownerPlayerId);
+                    const color1 = owner1 ? owner1.color : "#fbbf24";
+                    
+                    // Reduced particle counts by 90% (spawning only 1 particle instead of 12)
+                    EffectSystem.addParticles(this, midX, midY, color1, 1, 160, 4);
+                }
+            }
+        }
+
+        this.bulletTops = this.bulletTops.filter(bt => !bt.markForDeletion);
+    }
+
+    private redirectBulletTopToNearestElite(bt: import('./types').BulletTop, angleSpread: number = 0) {
+        // Find nearest elite or boss zombie
+        const targets = this.zombies.filter(z => 
+            !z.markForDeletion && 
+            z.hp > 0 && 
+            (z.type === 'zombie_boss' || 
+             z.type === 'zombie_big' || 
+             z.type === 'zombie_bomb' || 
+             z.type === 'zombie_bouncing' || 
+             z.type === 'zombie_golden' || 
+             z.type === 'zombie_black')
+        );
+
+        let target = null;
+        if (targets.length > 0) {
+            let minDist = Infinity;
+            targets.forEach(t => {
+                const d = Math.hypot(t.x - bt.x, t.y - bt.y);
+                if (d < minDist) {
+                    minDist = d;
+                    target = t;
+                }
+            });
+        } else {
+            // Fallback to nearest regular zombie if no elites or bosses are present
+            const normalZombies = this.zombies.filter(z => !z.markForDeletion && z.hp > 0);
+            if (normalZombies.length > 0) {
+                let minDist = Infinity;
+                normalZombies.forEach(z => {
+                    const d = Math.hypot(z.x - bt.x, z.y - bt.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        target = z;
+                    }
+                });
+            }
+        }
+
+        if (target) {
+            const dx = target.x - bt.x;
+            const dy = target.y - bt.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0) {
+                let angle = Math.atan2(dy, dx);
+                if (angleSpread !== 0) {
+                    angle += angleSpread;
+                }
+                const targetSpeed = bt.speed || 1200;
+                bt.vx = Math.cos(angle) * targetSpeed;
+                bt.vy = Math.sin(angle) * targetSpeed;
+            }
+        }
+    }
+
+    update(dt: number, realDt: number = dt) {
         this.participants.forEach((p, i) => {
             if (p.selectionState === 'selecting' && p.selectionTimer !== undefined) {
                 // Timer is disabled to prevent auto-spawning/elimination during selection
@@ -1680,8 +2148,12 @@ export class GameEngine {
                 // SpawnSystem.spawnItemOrObstacle(this, 'obstacle_barrel');
             }
 
-            this.chestSpawnTimer += dt;
-            if (this.chestSpawnTimer > 10.0) {
+            const hasChest = this.obstacles.some(o => o.type === 'obstacle_chest' && !o.markForDeletion);
+            const hasBulletTops = this.bulletTops.some(bt => !bt.markForDeletion);
+            if (!hasChest && !hasBulletTops) {
+                this.chestSpawnTimer += dt;
+            }
+            if (this.chestSpawnTimer > 20.0) {
                 this.chestSpawnTimer = 0;
                 SpawnSystem.spawnChest(this);
             }
@@ -4255,6 +4727,7 @@ export class GameEngine {
 
         // Update active projectiles
         EffectSystem.updateProjectiles(this, dt);
+        this.updateBulletTops(dt, realDt);
 
         // Update particles
         this.particles.forEach(p => {
@@ -4280,8 +4753,9 @@ export class GameEngine {
 
         // Update floating texts
         this.floatingTexts.forEach(ft => {
-            ft.y += ft.vy * dt;
-            ft.life -= dt;
+            const currentDt = (ft.style === "armed_acquired") ? realDt : dt;
+            ft.y += ft.vy * currentDt;
+            ft.life -= currentDt;
         });
         this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
 

@@ -7,7 +7,7 @@ import type { GameEngine } from '../GameEngine';
 import { checkRayCircleCollision } from '../GameEngine';
 import { SoundSystem } from './SoundSystem';
 
-export function addParticles(engine: GameEngine, x: number, y: number, color: string, count: number, maxSpeed: number = 200, sizeBase=8) {
+export function addParticles(engine: GameEngine, x: number, y: number, color: string, count: number, maxSpeed: number = 200, sizeBase=8, isSpark=false) {
     for(let i=0; i<count; i++) {
         const ang = Math.random() * Math.PI * 2;
         const spd = Math.random() * maxSpeed;
@@ -17,7 +17,8 @@ export function addParticles(engine: GameEngine, x: number, y: number, color: st
             vy: Math.sin(ang) * spd,
             life: 1.0, maxLife: 0.5 + Math.random(),
             color,
-            size: Math.random() * sizeBase + 4
+            size: Math.random() * sizeBase + 4,
+            isSpark
         });
     }
 }

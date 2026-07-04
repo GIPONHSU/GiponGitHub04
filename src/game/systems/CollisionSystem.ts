@@ -727,6 +727,60 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
             // Grant "special armed ability" to the top
             // Placeholder: give a super state buff
             topOther.superTimer = (topOther.superTimer || 0) + 5; 
+            
+            // Spawn TWO BulletTops at the chest's position (moving in opposite directions after spiral)
+            const btSpeed = 1200; // Fast moving (increased by 3x)
+            const angle1 = Math.random() * Math.PI * 2;
+            
+            engine.bulletTops.push({
+                id: "bt_" + Math.random(),
+                type: 'bullet_top',
+                x: chest.x,
+                y: chest.y,
+                vx: Math.cos(angle1) * btSpeed,
+                vy: Math.sin(angle1) * btSpeed,
+                radius: 40, // 100% of normal top (which is 40)
+                mass: 1.5,
+                life: 15, // 15 seconds
+                maxLife: 15,
+                angle: 0,
+                spin: MAX_SPIN,
+                hitCooldowns: new Map<string, number>(),
+                speed: btSpeed,
+                ownerPlayerId: topOther.id,
+                isSpiraling: true,
+                spiralCenterX: chest.x,
+                spiralCenterY: chest.y,
+                spiralStartAngle: angle1,
+                spiralTimer: 0,
+                spiralDir: 1
+            });
+
+            const angle2 = angle1 + Math.PI;
+            engine.bulletTops.push({
+                id: "bt_" + Math.random(),
+                type: 'bullet_top',
+                x: chest.x,
+                y: chest.y,
+                vx: Math.cos(angle2) * btSpeed,
+                vy: Math.sin(angle2) * btSpeed,
+                radius: 40, // 100% of normal top (which is 40)
+                mass: 1.5,
+                life: 15, // 15 seconds
+                maxLife: 15,
+                angle: 0,
+                spin: MAX_SPIN,
+                hitCooldowns: new Map<string, number>(),
+                speed: btSpeed,
+                ownerPlayerId: topOther.id,
+                isSpiraling: true,
+                spiralCenterX: chest.x,
+                spiralCenterY: chest.y,
+                spiralStartAngle: angle2,
+                spiralTimer: 0,
+                spiralDir: 1
+            });
+
             EffectSystem.addParticles(
               engine,
               topOther.x,
@@ -739,14 +793,17 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
             
             engine.floatingTexts.push({
               id: "ft_" + Math.random(),
-              x: topOther.x,
-              y: topOther.y - 40,
-              text: "ARMED UP!",
-              color: "#3b82f6",
-              life: 1.5,
-              maxLife: 1.5,
+              x: chest.x,
+              y: chest.y - 40,
+              text: "啟動子彈陀螺!",
+              color: "#fbbf24", // Gold color, same as 任務達成!
+              life: 1.9,
+              maxLife: 1.9,
               vy: -30,
+              style: "armed_acquired"
             });
+
+            engine.armedAcquiredSlowMoTimer = 1.5;
           } else {
              EffectSystem.addParticles(
                engine,
