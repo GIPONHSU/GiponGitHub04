@@ -465,67 +465,39 @@ export function drawEffects(ctx: CanvasRenderingContext2D, engine: GameEngine, s
             const length = 48; // comet length proportion scaled up since bullet is larger
             const width = proj.radius;
 
-            if (proj.isMachineGun) {
-                // High-energy glowing capsule/pill shape for machine gun bullets
-                const length = 48;
-                const width = proj.radius * 2.5;
-                
-                ctx.shadowColor = proj.color;
-                ctx.shadowBlur = 12;
-                
-                const grad = ctx.createLinearGradient(-length, 0, length/2, 0);
-                grad.addColorStop(0, 'rgba(253, 186, 116, 0)');
-                grad.addColorStop(0.3, '#fdba74'); // light orange
-                grad.addColorStop(0.7, '#facc15'); // yellow
-                grad.addColorStop(1, '#ffffff'); // bright core towards front
-                
-                ctx.fillStyle = grad;
-                
-                ctx.beginPath();
-                ctx.ellipse(-length/3, 0, length/2, width/2, 0, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Extra intense glowing core
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowBlur = 12;
-                ctx.beginPath();
-                ctx.ellipse(0, 0, length/4, width/3, 0, 0, Math.PI * 2);
-                ctx.fill();
-            } else {
-                // Gradient from bullet color to white core
-                const gradient = ctx.createLinearGradient(-length, 0, 0, 0);
-                gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
-                gradient.addColorStop(0.3, proj.color);
-                gradient.addColorStop(0.8, proj.color);
-                gradient.addColorStop(1, '#ffffff');
-    
-                ctx.fillStyle = gradient;
-    
-                // Drawing high-energy comet-shaped projectile with a pointed main tip
-                ctx.beginPath();
-                ctx.moveTo(0, 0); // front tip
-                ctx.lineTo(-length, -width / 2); // trailing top-left
-                ctx.quadraticCurveTo(-length / 2, 0, -length, width / 2); // tail curve back
-                ctx.closePath();
-                ctx.fill();
-    
-                // Core neon glow blur
-                // Removed shadowColor for perf
-                // Removed shadowBlur for perf
-                
-                // Draw secondary outer glowing boundary aura
-                ctx.strokeStyle = proj.color;
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.arc(0, 0, width / 2.5, 0, Math.PI * 2);
-                ctx.stroke();
-    
-                // Core white hot fusion center
-                ctx.fillStyle = '#ffffff';
-                ctx.beginPath();
-                ctx.arc(0, 0, width / 3.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            // Gradient from bullet color to white core
+            const gradient = ctx.createLinearGradient(-length, 0, 0, 0);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            gradient.addColorStop(0.3, proj.color);
+            gradient.addColorStop(0.8, proj.color);
+            gradient.addColorStop(1, '#ffffff');
+
+            ctx.fillStyle = gradient;
+
+            // Drawing high-energy comet-shaped projectile with a pointed main tip
+            ctx.beginPath();
+            ctx.moveTo(0, 0); // front tip
+            ctx.lineTo(-length, -width / 2); // trailing top-left
+            ctx.quadraticCurveTo(-length / 2, 0, -length, width / 2); // tail curve back
+            ctx.closePath();
+            ctx.fill();
+
+            // Core neon glow blur
+            // Removed shadowColor for perf
+            // Removed shadowBlur for perf
+            
+            // Draw secondary outer glowing boundary aura
+            ctx.strokeStyle = proj.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, width / 2.5, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Core white hot fusion center
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, width / 3.5, 0, Math.PI * 2);
+            ctx.fill();
 
             ctx.restore();
         });

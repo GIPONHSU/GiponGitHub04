@@ -708,7 +708,7 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
           chest.hitCounts.set(topOther.id, hits);
 
           chest.flashTimer = 0.15;
-          SoundSystem.play("SE-Bay2");
+          SoundSystem.play("Attack_Punch_024");
           
           // 1/5 chance or guaranteed on 10th hit
           if (Math.random() < 0.2 || hits >= 10) {
@@ -725,9 +725,8 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
             );
             
             // Grant "special armed ability" to the top
-            topOther.armedTimer = 15.0;
-            topOther.armedFireTimer = 0;
-            topOther.armedAngle = 0;
+            // Placeholder: give a super state buff
+            topOther.superTimer = (topOther.superTimer || 0) + 5; 
             EffectSystem.addParticles(
               engine,
               topOther.x,

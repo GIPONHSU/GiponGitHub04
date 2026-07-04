@@ -8,7 +8,7 @@ import type { GameEngine } from '../GameEngine';
 import { Top, Entity } from '../types';
 import { CANVAS_W, CANVAS_H, TOP_RADIUS } from '../constants';
 
-export function applyDamageToZombie(engine: GameEngine, z: import('../types').Zombie, damage: number, sourceTopId: string, killProbabilityMultiplier: number = 1.0) {
+export function applyDamageToZombie(engine: GameEngine, z: import('../types').Zombie, damage: number, sourceTopId: string) {
     if (z.hp <= 0) return;
 
     // Initialize hit counts if not present
@@ -17,33 +17,33 @@ export function applyDamageToZombie(engine: GameEngine, z: import('../types').Zo
     }
     
     let currentHits = z.hitCounts.get(sourceTopId) || 0;
-    currentHits += 1 * killProbabilityMultiplier;
+    currentHits++;
     z.hitCounts.set(sourceTopId, currentHits);
 
     let instakill = false;
     
     if (z.type === 'zombie_boss') {
-        if (Math.random() < (1/1000) * killProbabilityMultiplier || currentHits >= 2000) {
+        if (Math.random() < 1/1000 || currentHits >= 2000) {
             instakill = true;
         }
     } else if (z.type === 'zombie_small') {
-        if (Math.random() < 0.5 * killProbabilityMultiplier || currentHits >= 4) {
+        if (Math.random() < 0.5 || currentHits >= 4) {
             instakill = true;
         }
     } else if (z.type === 'zombie_big') {
-        if (Math.random() < (1/6) * killProbabilityMultiplier || currentHits >= 12) {
+        if (Math.random() < 1/6 || currentHits >= 12) {
             instakill = true;
         }
     } else if (z.type === 'zombie_bomb') {
-        if (Math.random() < (1/8) * killProbabilityMultiplier || currentHits >= 16) {
+        if (Math.random() < 1/8 || currentHits >= 16) {
             instakill = true;
         }
     } else if (z.type === 'zombie_bouncing') {
-        if (Math.random() < (1/10) * killProbabilityMultiplier || currentHits >= 20) {
+        if (Math.random() < 1/10 || currentHits >= 20) {
             instakill = true;
         }
     } else if (z.type === 'zombie_golden' || z.type === 'zombie_black') {
-        if (Math.random() < (1/15) * killProbabilityMultiplier || currentHits >= 30) {
+        if (Math.random() < 1/15 || currentHits >= 30) {
             instakill = true;
         }
     }
@@ -248,19 +248,6 @@ export function handleZombieDeath(engine: GameEngine, z: import('../types').Zomb
         handleZombieKillForMissions(engine, killerId, z.type);
     }
     
-    // If the dying zombie was in a struggle clash, free the top!
-    if ((z.type === 'zombie_boss' || z.type === 'zombie_black') && (z as any).bossAttackState === 'struggle_clash') {
-        const targetTop = engine.tops.find(t => t.id === (z as any).bossWarningTargetId);
-        if (targetTop) {
-            targetTop.struggleJitterX = undefined;
-            targetTop.struggleJitterY = undefined;
-            (targetTop as any).struggleAnchorX = undefined;
-            (targetTop as any).struggleAnchorY = undefined;
-            targetTop.struggleMashCount = undefined;
-            targetTop.struggleMashRequired = undefined;
-        }
-    }
-
     if (z.type === 'zombie_small' || z.type === 'zombie_big' || z.type === 'zombie_bomb' || z.type === 'zombie_bouncing' || z.type === 'zombie_golden' || z.type === 'zombie_black') {
         (z as any).isDying = true;
         (z as any).dyingTimer = z.type === 'zombie_small' ? 0.3 : 1.25;

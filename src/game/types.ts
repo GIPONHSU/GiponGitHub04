@@ -148,12 +148,6 @@ export interface Top extends Entity {
         zombie_bouncing: number;
     };
     rainbowSuperTimer?: number;
-    armedTimer?: number;
-    armedFireTimer?: number;
-    armedAngle?: number;
-    armedSoundTimer?: number;
-    armedStateTimer?: number;
-    armedFireCount?: number;
 }
 
 export interface Zombie extends Entity {
@@ -293,11 +287,6 @@ export interface Projectile {
     trail?: { x: number; y: number }[];
     hitIds?: string[];
     isBombBeam?: boolean;
-    isMachineGun?: boolean;
-    startX?: number;
-    startY?: number;
-    offsetX?: number;
-    offsetY?: number;
 }
 
 export interface PhantomClone {

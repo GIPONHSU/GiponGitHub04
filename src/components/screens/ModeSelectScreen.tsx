@@ -54,7 +54,7 @@ export default function ModeSelectScreen({ onSelectMode, energyPerCoin, onEnergy
           </h1>
           <p className="text-slate-400 text-2xl uppercase tracking-[0.4em] font-extrabold flex items-center justify-center gap-6">
             <span className="w-16 h-[3px] bg-cyan-500/50" />
-            彩票機 V1.0
+            彩票機 V1.1
             <span className="w-16 h-[3px] bg-red-500/50" />
           </p>
         </div>

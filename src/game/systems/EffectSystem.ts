@@ -152,71 +152,6 @@ export function addChainsawSparkParticles(engine: GameEngine, x: number, y: numb
 }
 
 export function updateProjectiles(engine: GameEngine, dt: number) {
-    // Process armed timer for tops to fire machine gun bullets
-    engine.tops.forEach(top => {
-        if (top.hp <= 0) return;
-        if (top.armedTimer !== undefined && top.armedTimer > 0) {
-            top.armedTimer -= dt;
-            if (top.armedTimer < 0) top.armedTimer = 0;
-            
-            const isBusy = (top.dashTimer !== undefined && top.dashTimer > 0) ||
-                           (top.bounceTimer !== undefined && top.bounceTimer > 0) ||
-                           (top.damageShockTimer !== undefined && top.damageShockTimer > 0) ||
-                           (top.customKnockbackTimer !== undefined && top.customKnockbackTimer > 0) ||
-                           (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0) ||
-                           (top.model2SkillTimer !== undefined && top.model2SkillTimer > 0) ||
-                           (top.model3SkillTimer !== undefined && top.model3SkillTimer > 0) ||
-                           (top.coopState !== undefined) ||
-                           (top.launchPadState === 'charging' || top.launchPadState === 'flying' || top.launchPadState === 'dashing') ||
-                           (top.isExploding === true);
-
-            if (!isBusy) {
-                top.armedSoundTimer = (top.armedSoundTimer ?? 0) - dt;
-                
-                top.armedStateTimer = (top.armedStateTimer ?? 0) + dt;
-                if (top.armedStateTimer >= 1.0) {
-                    top.armedStateTimer -= 1.0;
-                    top.armedFireCount = 0;
-                }
-                
-                if (top.armedStateTimer < 0.5 && (top.armedFireCount ?? 0) < 8) {
-                    top.armedFireTimer = (top.armedFireTimer ?? 0) - dt;
-                    while (top.armedFireTimer <= 0 && (top.armedFireCount ?? 0) < 8) {
-                        top.armedFireTimer += 0.5 / 8; // 8 bullets in 0.5 seconds
-                        top.armedFireCount = (top.armedFireCount ?? 0) + 1;
-                        top.armedAngle = (top.armedAngle ?? 0) + (Math.PI / 4); // 8 directions (45 deg)
-                        
-                        const speed = 1200; // Increased from 500 px/s to 1200 px/s
-                        
-                        if ((top.armedSoundTimer ?? 0) <= 0) {
-                            top.armedSoundTimer = 0.15; // play sound every 0.15s max
-                            SoundSystem.play('Shot_Beam_08');
-                        }
-                        
-                        const angle = top.armedAngle;
-                        engine.projectiles.push({
-                            id: `proj_mg_${Math.random()}`,
-                            ownerId: top.id,
-                            x: top.x,
-                            y: top.y,
-                            startX: top.x,
-                            startY: top.y,
-                            vx: Math.cos(angle) * speed,
-                            vy: Math.sin(angle) * speed,
-                            radius: 6, // Doubled radius
-                            color: '#facc15', // yellow bullet
-                            life: 0.4, // Reduced to keep range approx same with higher speed
-                            maxLife: 0.4,
-                            damage: 10,
-                            isMachineGun: true,
-                            hitIds: []
-                        });
-                    }
-                }
-            }
-        }
-    });
-
     engine.projectiles.forEach(proj => {
         // Find nearest target (zombies or opponent tops) for auto-homing ammunition behavior
         let targetX = 0;
@@ -259,7 +194,7 @@ export function updateProjectiles(engine: GameEngine, dt: number) {
                     const dy = (desiredY / desiredDist) * speed;
 
                     // Smoothly steer velocity towards target
-                    const ease = proj.isMachineGun ? 15.0 : 3.8;
+                    const ease = 3.8;
                     proj.vx += (dx - proj.vx) * ease * dt;
                     proj.vy += (dy - proj.vy) * ease * dt;
 
@@ -338,23 +273,13 @@ export function updateProjectiles(engine: GameEngine, dt: number) {
 
             if (hit) {
                 proj.hitIds!.push(z.id);
-                GameUtils.applyDamageToZombie(engine, z, proj.damage, proj.ownerId, proj.isMachineGun ? 0.5 : 1.0);
+                GameUtils.applyDamageToZombie(engine, z, proj.damage, proj.ownerId);
                 if (z.type === 'zombie_boss') {
                     SoundSystem.play('SE-Explo1');
                 }
                 z.flashTimer = 0.15;
-                if (!proj.isMachineGun) {
-                    addParticles(engine, z.x, z.y, proj.color, 8, 120, 3);
-                    addParticles(engine, z.x, z.y, '#ffffff', 4, 140, 2);
-                }
-                
-                if (proj.isMachineGun) {
-                    proj.life = 0;
-                    engine.shockwaves.push({
-                        x: proj.x, y: proj.y, radius: 10, maxRadius: 100, speed: 500,
-                        color: 'rgba(253, 186, 116, 0.9)', thickness: 12, life: 0.3, maxLife: 0.3
-                    });
-                }
+                addParticles(engine, z.x, z.y, proj.color, 8, 120, 3);
+                addParticles(engine, z.x, z.y, '#ffffff', 4, 140, 2);
 
                 if (z.hp <= 0) {
                     const isAlreadyDying = (z as any).isDying;
@@ -413,18 +338,9 @@ export function updateProjectiles(engine: GameEngine, dt: number) {
                         other.flashTimer = 0.15;
                         other.damageShockTimer = 0.25;
                         other.visualHp = other.visualHp !== undefined ? Math.max(other.hp, other.visualHp) : other.hp;
-                        if (!proj.isMachineGun) {
-                            addParticles(engine, proj.x, proj.y, proj.color, 8, 120, 3);
-                            addParticles(engine, proj.x, proj.y, '#ffffff', 4, 140, 2);
-                        }
-                        
-                        if (proj.isMachineGun) {
-                            proj.life = 0;
-                            engine.shockwaves.push({
-                                x: proj.x, y: proj.y, radius: 10, maxRadius: 100, speed: 500,
-                                color: 'rgba(253, 186, 116, 0.9)', thickness: 12, life: 0.3, maxLife: 0.3
-                            });
-                        }
+
+                        addParticles(engine, proj.x, proj.y, proj.color, 8, 120, 3);
+                        addParticles(engine, proj.x, proj.y, '#ffffff', 4, 140, 2);
 
                         if (other.hp <= 0) {
                             other.markForDeletion = true;
@@ -453,9 +369,7 @@ export function updateProjectiles(engine: GameEngine, dt: number) {
                         if (o.durability === undefined) o.durability = 1;
                         o.durability -= proj.damage;
                         o.flashTimer = 0.15;
-                        if (!proj.isMachineGun) {
-                            addParticles(engine, proj.x, proj.y, proj.color, 8, 100, 3);
-                        }
+                        addParticles(engine, proj.x, proj.y, proj.color, 8, 100, 3);
                         
                         if (o.durability <= 0) {
                             o.markForDeletion = true;
@@ -471,17 +385,7 @@ export function updateProjectiles(engine: GameEngine, dt: number) {
                         }
                     } else {
                         // hit crate
-                        if (!proj.isMachineGun) {
-                            addParticles(engine, proj.x, proj.y, proj.color, 6, 100, 2);
-                        }
-                    }
-                    
-                    if (proj.isMachineGun) {
-                        proj.life = 0;
-                        engine.shockwaves.push({
-                            x: proj.x, y: proj.y, radius: 10, maxRadius: 100, speed: 500,
-                            color: 'rgba(253, 186, 116, 0.9)', thickness: 12, life: 0.3, maxLife: 0.3
-                        });
+                        addParticles(engine, proj.x, proj.y, proj.color, 6, 100, 2);
                     }
                 }
             });
