@@ -1046,7 +1046,7 @@ export function drawUI(ctx: CanvasRenderingContext2D, engine: GameEngine) {
     );
 
     // Line 2: Coin Prompt / Token Count (moved up from Line 3)
-    const coinText = `按[${idx + 1}]投幣 | 代幣:${top ? (top.coins ?? 0) : 0}`;
+    const coinText = `按[${idx + 1}]投幣 | 1幣${engine.energyPerCoin}能量`;
     drawTextWithShadow(
       coinText,
       drawX + 10,

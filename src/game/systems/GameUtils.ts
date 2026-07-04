@@ -244,6 +244,19 @@ export function handleZombieDeath(engine: GameEngine, z: import('../types').Zomb
         return false;
     }
 
+    const zAny = z as any;
+    if ((z.type === 'zombie_black' || z.type === 'zombie_boss') && zAny.bossAttackState === 'struggle_clash') {
+        const top = engine.tops.find(t => t.id === zAny.bossWarningTargetId);
+        if (top) {
+            top.struggleJitterX = undefined;
+            top.struggleJitterY = undefined;
+            (top as any).struggleAnchorX = undefined;
+            (top as any).struggleAnchorY = undefined;
+            top.struggleMashCount = undefined;
+            top.struggleMashRequired = undefined;
+        }
+    }
+
     if (z.type !== 'zombie_boss') {
         handleZombieKillForMissions(engine, killerId, z.type);
     }

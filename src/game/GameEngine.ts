@@ -3762,7 +3762,8 @@ export class GameEngine {
         // ─── 核心強化氣旋判定範圍（傷害1點） ───
         this.tops.forEach(top => {
             // 轉速 5 格以上（top.spin >= 500）且處於 standby 繞行狀態並正在旋轉
-            const isEnhanced = top.state === 'standby' && top.isSpinning && top.spin >= 500;
+            // 依用戶要求：繞行狀態下的陀螺本身不再具備額外擴展範圍的氣旋攻擊判定
+            const isEnhanced = false;
             if (!isEnhanced) return;
 
             // 圓形攻擊判定半徑等同強力氣旋特效的半徑大小 (top.radius + 100 像素)

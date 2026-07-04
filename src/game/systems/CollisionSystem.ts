@@ -798,7 +798,7 @@ export function hitZombie(
       z.type === "zombie_big" ||
       z.type === "zombie_bomb") &&
     !top.isExploding &&
-    !isCurrentlyDashing
+    !isCurrentlyDashing && top.state !== "standby"
   ) {
     const isSuper =
       (top.superTimer !== undefined && top.superTimer > 0) ||
@@ -849,6 +849,7 @@ export function hitZombie(
         } as any);
 
         // 陀螺待機繞圈時，若不是處於按下加速鍵的狀態，則型塑短距離的碰撞偏移物理反映
+        /*
         if (
           top.state === "standby" &&
           !top.isSpinning &&
@@ -869,9 +870,9 @@ export function hitZombie(
           // 在高轉速/大繞圈軌道下，將偏移力道與滑行速度顯著放大，以呈現明顯被撞偏離軌道的視覺效果
           const spinRatio = (top.spin ?? MAX_SPIN) / MAX_SPIN;
           const spinMultiplier = 1.0 + spinRatio * 3.0; // 高轉速時偏移增強達4.0倍
-
           // Reduce standby center knockback & deflection rebound speed by 25% per user request (multiplied by 1.125 instead of 1.5)
           const kbPower = 640 * spinMultiplier * 1.125;
+
           top.standbyCenterVx = (top.standbyCenterVx || 0) + dirVx * kbPower;
           top.standbyCenterVy = (top.standbyCenterVy || 0) + dirVy * kbPower;
 
@@ -882,6 +883,7 @@ export function hitZombie(
           top.bounceTimer = 0.3;
           top.maxBounceTimer = 0.3;
         }
+        */
       }
     }
   }
@@ -1014,7 +1016,7 @@ export function hitZombie(
               top.rainbowSuperTimer > 0) ||
             (top.breakoutOrbitTimer !== undefined &&
               top.breakoutOrbitTimer > 0);
-          if (!isInvulnerable) {
+          if (!isInvulnerable && top.state !== "standby") {
             SoundSystem.play("SE-Hurt1");
             top.hitCooldown = 1.0; // 1 second invincibility protection frame!
             top.flashTimer = 0.25;
@@ -1125,8 +1127,7 @@ export function hitZombie(
         top.vy = (top.dashDirectionY ?? 0) * dashSpeed;
       }
       if (top.state === "standby") {
-        top.standbyCenterVx = nx * bounceForce;
-        top.standbyCenterVy = ny * bounceForce;
+        // No bounce when in standby state
       }
       return; // Absolutely bypass normal hit logic
     }
@@ -1157,7 +1158,7 @@ export function hitZombie(
               top.rainbowSuperTimer > 0) ||
             (top.breakoutOrbitTimer !== undefined &&
               top.breakoutOrbitTimer > 0);
-          if (!isInvulnerable) {
+          if (!isInvulnerable && top.state !== "standby") {
             SoundSystem.play("SE-Hurt1");
             top.hitCooldown = 0.8; // 0.8 seconds protection frame
             top.flashTimer = 0.25;
@@ -1265,8 +1266,7 @@ export function hitZombie(
         top.vy = (top.dashDirectionY ?? 0) * dashSpeed;
       }
       if (top.state === "standby") {
-        top.standbyCenterVx = nx * bounceForce;
-        top.standbyCenterVy = ny * bounceForce;
+        // No bounce when in standby state
       }
       return; // Absolutely bypass normal hit logic
     }
@@ -1337,8 +1337,7 @@ export function hitZombie(
         top.vy = (top.dashDirectionY ?? 0) * dashSpeed;
       }
       if (top.state === "standby") {
-        top.standbyCenterVx = nx * bounceForce;
-        top.standbyCenterVy = ny * bounceForce;
+        // No bounce when in standby state
       }
       return;
     }
@@ -1564,7 +1563,7 @@ export function hitZombie(
     offsetPower *= 2.0;
   }
 
-  if (!(top.state === "standby" && z.type === "zombie_small")) {
+  if (top.state !== "standby") {
     top.deflectionVx = (top.deflectionVx || 0) + rx * finalPower;
     top.deflectionVy = (top.deflectionVy || 0) + ry * finalPower;
     top.bounceTimer = 0.35;
@@ -1575,6 +1574,7 @@ export function hitZombie(
   }
 
   // If in standby state, also knock back the standby center of orbit directly away from the zombie
+  /* 
   if (top.state === "standby" && z.type !== "zombie_small") {
     const spinRatio = (top.spin ?? MAX_SPIN) / MAX_SPIN;
     const spinMultiplier = 1.0 + spinRatio * 2.0;
@@ -1591,6 +1591,7 @@ export function hitZombie(
     top.standbyCenterVy = (top.standbyCenterVy || 0) + ry * kbPower;
     top.joystickReboundTimer = 0.25;
   }
+  */
 
   // Each collision consumes durability units (scaled by top size)
   // If spin is 5 or more (i.e. >= 50% of max), the damage value is 2

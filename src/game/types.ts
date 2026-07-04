@@ -1,4 +1,4 @@
-export type EntityType = 'top' | 'zombie_small' | 'zombie_big' | 'zombie_boss' | 'zombie_bomb' | 'zombie_bouncing' | 'zombie_golden' | 'zombie_black' | 'obstacle_barrel' | 'item_crate' | 'item_ticket' | 'item_key';
+export type EntityType = 'top' | 'zombie_small' | 'zombie_big' | 'zombie_boss' | 'zombie_bomb' | 'zombie_bouncing' | 'zombie_golden' | 'zombie_black' | 'obstacle_barrel' | 'obstacle_chest' | 'item_crate' | 'item_ticket' | 'item_key';
 
 export interface Entity {
     id: string;
@@ -211,7 +211,7 @@ export interface Obstacle extends Entity {
 }
 
 export interface Item extends Entity {
-    type: 'item_crate' | 'item_ticket' | 'item_key';
+    type: 'item_crate' | 'item_ticket'  | 'item_key';
     amount?: number;
     targetPlayerId?: string;
     hoverTimer?: number;
