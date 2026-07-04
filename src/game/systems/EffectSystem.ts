@@ -458,3 +458,44 @@ export function addPurpleDashParticles(engine: GameEngine, x: number, y: number,
     }
 }
 
+export function spawnBoxStarExplosion(engine: GameEngine, x: number, y: number) {
+    // 1. Central star burst (shining gold/yellow/white)
+    engine.particles.push({
+        x: x,
+        y: y,
+        vx: 0,
+        vy: 0,
+        life: 0.35, 
+        maxLife: 0.35,
+        color: '#facc15', // Gold
+        size: 110,
+        isBossStarExplosion: true,
+        angle: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 4
+    });
+
+    // 2. Star sparks flying outwards radially (16 sparks)
+    const sparkCount = 16;
+    for (let i = 0; i < sparkCount; i++) {
+        const baseAng = (i / sparkCount) * Math.PI * 2 + (Math.random() * 0.3 - 0.15);
+        const sparkSpeed = 220 + Math.random() * 200;
+        const colors = ['#f97316', '#facc15', '#ea580c', '#eab308', '#ffffff'];
+        const chosenColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        engine.particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(baseAng) * sparkSpeed,
+            vy: Math.sin(baseAng) * sparkSpeed,
+            life: 0.4 + Math.random() * 0.3,
+            maxLife: 0.7,
+            color: chosenColor,
+            size: 15 + Math.random() * 10,
+            isStarSpark: true,
+            angle: Math.random() * Math.PI * 2,
+            rotationSpeed: (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 5)
+        });
+    }
+}
+
+

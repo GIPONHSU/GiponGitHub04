@@ -9,7 +9,7 @@ const { FBXLoader } = require('three/examples/jsm/loaders/FBXLoader.js');
 const loader = new FBXLoader();
 ['Gorilla_atk.fbx', 'Gorilla_idle.fbx', 'Gorilla_walk.fbx'].forEach(file => {
     try {
-        const buffer = fs.readFileSync('./FBX/' + file);
+        const buffer = fs.readFileSync('./public/FBX/' + file);
         const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
         const fbx = loader.parse(arrayBuffer, '');
         console.log(file, "has clips:");

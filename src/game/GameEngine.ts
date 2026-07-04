@@ -299,82 +299,7 @@ export class GameEngine {
         ];
 
         // 1. Generate 3 rectangular concrete blocks (50% smaller size)
-        for (let i = 0; i < 3; i++) {
-            const w = (150 + Math.random() * 80) * 0.5;
-            const h = (150 + Math.random() * 80) * 0.5;
-            let bx = 0;
-            let by = 0;
-            let attempts = 0;
-            while (attempts < 100) {
-                bx = 400 + Math.random() * (CANVAS_W - 800);
-                by = 250 + Math.random() * (CANVAS_H - 500);
-
-                // Ensure far from spawn corners
-                let farFromSpawns = true;
-                for (const pos of startPos) {
-                    if (Math.hypot(bx - pos.x, by - pos.y) < 350) {
-                        farFromSpawns = false;
-                        break;
-                    }
-                }
-
-                // Ensure not overlapping previous blocks
-                let farFromOthers = true;
-                for (const other of this.concreteBlocks) {
-                    const minDistX = (w + other.w) / 2 + 100;
-                    const minDistY = (h + other.h) / 2 + 100;
-                    if (Math.abs(bx - other.x) < minDistX && Math.abs(by - other.y) < minDistY) {
-                        farFromOthers = false;
-                        break;
-                    }
-                }
-
-                // Ensure all 4 corners are inside the horizontal capsule with a safe margin
-                let insideCapsule = true;
-                const corners = [
-                    { x: bx - w/2, y: by - h/2 },
-                    { x: bx + w/2, y: by - h/2 },
-                    { x: bx - w/2, y: by + h/2 },
-                    { x: bx + w/2, y: by + h/2 }
-                ];
-                for (const pt of corners) {
-                    if (!GameUtils.isPointInsideCapsule(this, pt.x, pt.y, 40)) {
-                        insideCapsule = false;
-                        break;
-                    }
-                }
-
-                // Ensure far from launch pads as well
-                let farFromLaunchPads = true;
-                const padsToCheck = [
-                    { x: 360, y: 840 },
-                    { x: 1560, y: 240 },
-                    { x: 960, y: 540 }
-                ];
-                for (const pad of padsToCheck) {
-                    if (Math.hypot(bx - pad.x, by - pad.y) < 220) {
-                        farFromLaunchPads = false;
-                        break;
-                    }
-                }
-
-                if (farFromSpawns && farFromOthers && insideCapsule && farFromLaunchPads) {
-                    break;
-                }
-                attempts++;
-            }
-
-            this.concreteBlocks.push({
-                id: `concrete_${i}`,
-                type: 'concrete_block',
-                x: bx,
-                y: by,
-                w,
-                h,
-                durability: 5,
-                markForDeletion: false
-            });
-        }
+        this.generateConcreteBlocksForCenter(540);
 
         this.introActive = false;
         this.introStage = 'none';
@@ -452,6 +377,93 @@ export class GameEngine {
         
         this.lastTime = performance.now();
         this.rafId = requestAnimationFrame((t) => this.loop(t));
+    }
+
+    generateConcreteBlocksForCenter(centerY: number) {
+        const startPosOffset = centerY - 540;
+        const startPos = [
+            { x: 360, y: (CANVAS_H - 360) + startPosOffset },
+            { x: CANVAS_W - 360, y: (CANVAS_H - 360) + startPosOffset },
+            { x: 360, y: 360 + startPosOffset },
+            { x: CANVAS_W - 360, y: 360 + startPosOffset }
+        ];
+
+        for (let i = 0; i < 3; i++) {
+            const w = (150 + Math.random() * 80) * 0.5;
+            const h = (150 + Math.random() * 80) * 0.5;
+            let bx = 0;
+            let by = 0;
+            let attempts = 0;
+            while (attempts < 100) {
+                bx = 400 + Math.random() * (CANVAS_W - 800);
+                by = startPosOffset + 250 + Math.random() * (CANVAS_H - 500);
+
+                // Ensure far from spawn corners
+                let farFromSpawns = true;
+                for (const pos of startPos) {
+                    if (Math.hypot(bx - pos.x, by - pos.y) < 350) {
+                        farFromSpawns = false;
+                        break;
+                    }
+                }
+
+                // Ensure not overlapping previous blocks
+                let farFromOthers = true;
+                for (const other of this.concreteBlocks) {
+                    const minDistX = (w + other.w) / 2 + 100;
+                    const minDistY = (h + other.h) / 2 + 100;
+                    if (Math.abs(bx - other.x) < minDistX && Math.abs(by - other.y) < minDistY) {
+                        farFromOthers = false;
+                        break;
+                    }
+                }
+
+                // Ensure all 4 corners are inside the horizontal capsule with a safe margin
+                let insideCapsule = true;
+                const corners = [
+                    { x: bx - w/2, y: by - h/2 },
+                    { x: bx + w/2, y: by - h/2 },
+                    { x: bx - w/2, y: by + h/2 },
+                    { x: bx + w/2, y: by + h/2 }
+                ];
+                for (const pt of corners) {
+                    if (!GameUtils.isPointInsideCapsule(this, pt.x, pt.y, 40)) {
+                        insideCapsule = false;
+                        break;
+                    }
+                }
+
+                // Ensure far from launch pads as well
+                let farFromLaunchPads = true;
+                const padsToCheck = [
+                    { x: 360, y: 840 + startPosOffset },
+                    { x: 1560, y: 240 + startPosOffset },
+                    { x: 960, y: 540 + startPosOffset }
+                ];
+                for (const pad of padsToCheck) {
+                    if (Math.hypot(bx - pad.x, by - pad.y) < 220) {
+                        farFromLaunchPads = false;
+                        break;
+                    }
+                }
+
+                if (farFromSpawns && farFromOthers && insideCapsule && farFromLaunchPads) {
+                    break;
+                }
+                attempts++;
+            }
+
+            this.concreteBlocks.push({
+                id: `concrete_${i}_${Date.now()}_${Math.random()}`,
+                type: 'concrete_block',
+                x: bx,
+                y: by,
+                w,
+                h,
+                durability: 5,
+                markForDeletion: false
+            });
+        }
     }
 
     insertCoin(coinSlotIdx: number) {
@@ -1419,6 +1431,9 @@ export class GameEngine {
                 this.explosionSpawnTimer = 0;
                 this.activeLaunchPads = []; // clear launch pads
                 this.launchPadSpawnTimer = 0;
+                this.obstacles = []; // clear all other obstacles (chests, barrels, gears, crates)
+                this.items = []; // clear all items
+                this.concreteBlocks = []; // clear static concrete blocks
                 
                 // Immediately destroy all zombies without dropping items
                 this.zombies.forEach(z => {
@@ -1492,10 +1507,20 @@ export class GameEngine {
                         const deltaY = newCenterY - this.activeArenaCenterY;
                         this.activeArenaCenterY = newCenterY;
 
-                        // Move items/particles/blocks
-                        this.obstacles.forEach(o => o.y += deltaY);
-                        this.items.forEach(item => item.y += deltaY);
-                        this.concreteBlocks.forEach(block => block.y += deltaY);
+                        // Regenerate and spawn obstacles/chests for the new battlefield
+                        this.obstacles = [];
+                        this.items = [];
+                        this.concreteBlocks = [];
+                        this.activeLaunchPads = [];
+                        this.generateConcreteBlocksForCenter(newCenterY);
+
+                        // Reset spawn timers exactly like the first battlefield's startup (initGame)
+                        this.chestSpawnTimer = 0;
+                        this.obstacleTimer = 0;
+                        this.starSpawnTimer = 0;
+                        this.launchPadSpawnTimer = 0;
+
+                        // Move other transient visual assets
                         this.particles.forEach(p => p.y += deltaY);
                         this.shockwaves.forEach(s => s.y += deltaY);
                         this.slashLines.forEach(l => { l.y1 += deltaY; l.y2 += deltaY; });

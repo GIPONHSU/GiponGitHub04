@@ -552,9 +552,9 @@ export function spawnChest(engine: GameEngine) {
       }
 
       const padsToCheck = [
-        { x: 360, y: 840 },
-        { x: 1560, y: 240 },
-        { x: 960, y: 540 },
+        { x: 360, y: centerY + 300 },
+        { x: 1560, y: centerY - 300 },
+        { x: 960, y: centerY },
       ];
       let tooCloseToPad = false;
       for (const pad of padsToCheck) {
@@ -699,9 +699,9 @@ export function spawnItemOrObstacle(
 
       // 4. Keep away from launch pads (corners and center!)
       const padsToCheck = [
-        { x: 360, y: 840 },
-        { x: 1560, y: 240 },
-        { x: 960, y: 540 },
+        { x: 360, y: centerY + 300 },
+        { x: 1560, y: centerY - 300 },
+        { x: 960, y: centerY },
       ];
       let tooCloseToPad = false;
       for (const pad of padsToCheck) {

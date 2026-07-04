@@ -8,7 +8,7 @@ global.window = window;
 global.document = window.document;
 
 const loader = new FBXLoader();
-const fbxData = fs.readFileSync("./FBX/Monkey.fbx");
+const fbxData = fs.readFileSync("./public/FBX/Monkey.fbx");
 const buffer = new Uint8Array(fbxData).buffer;
 
 try {

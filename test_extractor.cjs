@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const fbxPath = './FBX/ANI_GraveRobber_Skill_Atk.fbx';
+const fbxPath = './public/FBX/ANI_GraveRobber_Skill_Atk.fbx';
 const buffer = fs.readFileSync(fbxPath);
 let str = '';
 for(let i=0; i<Math.min(buffer.length, 5000000); i++) {

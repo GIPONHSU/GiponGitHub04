@@ -14,7 +14,7 @@ global.document = {
 const { FBXLoader } = require('three/examples/jsm/loaders/FBXLoader.js');
 
 const loader = new FBXLoader();
-const buffer = fs.readFileSync('FBX/ANI_MobBoss_All.fbx');
+const buffer = fs.readFileSync('public/FBX/ANI_MobBoss_All.fbx');
 const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 
 try {

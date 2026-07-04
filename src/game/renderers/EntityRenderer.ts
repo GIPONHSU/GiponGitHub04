@@ -318,6 +318,40 @@ export function drawEntities(
       return;
     }
 
+    if (o.type === "obstacle_chest" && zombie3D.isLoaded) {
+      const dom = zombie3D.getFrame(false, false, 0, 0, "box");
+      if (dom) {
+        const drawSize = 130 * (o.radius / 40) * 0.8;
+        ctx.save();
+        ctx.translate(o.x, o.y);
+
+        // Calculate a shifting neon rainbow hue for the outer glow
+        const time = Date.now() * 0.0035;
+        const hue = (time * 60) % 360;
+
+        // Apply a highly polished, glowing outer drop shadow that matches the exact shape of the box
+        ctx.shadowColor = `hsla(${hue}, 100%, 60%, 1)`;
+        ctx.shadowBlur = 31.2 + Math.sin(time * 2) * 7.8; // Dynamic pulsing outer glow radius (increased by 30%)
+
+        if (o.flashTimer !== undefined && o.flashTimer > 0) {
+          ctx.filter = "brightness(0) invert(1)";
+        }
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+
+        // Draw the textured box. With shadow properties enabled, 
+        // HTML5 Canvas creates a gorgeous contour-conforming glowing aura around the box!
+        ctx.drawImage(dom, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+
+        ctx.imageSmoothingEnabled = prevSmoothing;
+        if (o.flashTimer !== undefined && o.flashTimer > 0) {
+          ctx.filter = "none";
+        }
+        ctx.restore();
+        return;
+      }
+    }
+
     ctx.save();
     let spr = sprites["barrel"];
     if (o.type === "obstacle_chest") {

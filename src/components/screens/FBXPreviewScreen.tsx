@@ -19,7 +19,8 @@ const FBX_FILES = [
   'ANI_GraveRobber_Skill_Atk.fbx',
   'Monkey.fbx',
   'ANI_MobBoss_All.fbx',
-  'Gorilla'
+  'Gorilla',
+  'box.fbx'
 ];
 
 interface FBXPreviewScreenProps {
@@ -587,6 +588,40 @@ export default function FBXPreviewScreen({ onBack }: FBXPreviewScreenProps) {
                 }
               }
             }
+          });
+        }
+
+        // Apply texture specifically for box.fbx
+        if (selectedFile === 'box.fbx') {
+          const textureLoader = new THREE.TextureLoader();
+          textureLoader.load('/Textures/T_AirdropBox_2D_View.jpg', (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace;
+            object.traverse((child) => {
+              if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                if (Array.isArray(mesh.material)) {
+                  mesh.material.forEach(mat => {
+                    if ('map' in mat) {
+                      (mat as any).map = texture;
+                      mat.needsUpdate = true;
+                    } else {
+                      mesh.material = new THREE.MeshStandardMaterial({
+                        map: texture,
+                      });
+                    }
+                  });
+                } else {
+                  if (mesh.material && 'map' in mesh.material) {
+                    (mesh.material as any).map = texture;
+                    mesh.material.needsUpdate = true;
+                  } else {
+                    mesh.material = new THREE.MeshStandardMaterial({
+                      map: texture,
+                    });
+                  }
+                }
+              }
+            });
           });
         }
         

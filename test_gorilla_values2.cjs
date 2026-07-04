@@ -13,7 +13,7 @@ const { FBXLoader } = require('three/examples/jsm/loaders/FBXLoader.js');
 const loader = new FBXLoader();
 
 function checkMovement(file) {
-    const buffer = fs.readFileSync('./FBX/' + file);
+    const buffer = fs.readFileSync('./public/FBX/' + file);
     const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
     const fbx = loader.parse(arrayBuffer, '');
     const clip = fbx.animations[0];

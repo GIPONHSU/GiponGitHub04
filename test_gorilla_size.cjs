@@ -16,7 +16,7 @@ global.document = {
 const { FBXLoader } = require('three/examples/jsm/loaders/FBXLoader.js');
 
 const loader = new FBXLoader();
-const buffer = fs.readFileSync('FBX/Gorilla_idle.fbx');
+const buffer = fs.readFileSync('public/FBX/Gorilla_idle.fbx');
 const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 
 try {

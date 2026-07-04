@@ -28,6 +28,7 @@ class Zombie3DRenderer {
     golden?: ModelData;
     gorilla?: ModelData;
     monkey?: ModelData;
+    box?: any;
   } = {};
 
   get isLoaded() {
@@ -40,7 +41,8 @@ class Zombie3DRenderer {
       !!this.models.football &&
       !!this.models.golden &&
       !!this.models.gorilla &&
-      !!this.models.monkey
+      !!this.models.monkey &&
+      !!this.models.box
     );
   }
 
@@ -831,6 +833,35 @@ class Zombie3DRenderer {
         }
       });
     });
+
+    // Load Box
+    fbxLoader.load("/FBX/box.fbx", (object) => {
+      texLoader.load("/Textures/T_AirdropBox_2D_View.jpg", (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        object.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.material = new THREE.MeshStandardMaterial({
+              map: texture,
+              emissive: 0xffffff,
+              emissiveMap: texture,
+              emissiveIntensity: 0.5, // Brighter 3D representation in this scene
+            });
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+
+        object.visible = false;
+        object.scale.set(1.0, 1.0, 1.0);
+        this.scene.add(object);
+
+        this.models.box = {
+          model: object,
+        } as any;
+      });
+    });
   }
 
   getFrame(
@@ -847,13 +878,11 @@ class Zombie3DRenderer {
       | "football"
       | "golden"
       | "gorilla"
-      | "monkey" = "man",
+      | "monkey"
+      | "box" = "man",
     actionName?: string
   ): HTMLCanvasElement | null {
     if (!this.isLoaded) return null;
-
-    const data = this.models[modelType as keyof typeof this.models];
-    if (!data) return null;
 
     // Hide all models
     if (this.models.man) this.models.man.model.visible = false;
@@ -865,6 +894,24 @@ class Zombie3DRenderer {
     if (this.models.golden) this.models.golden.model.visible = false;
     if (this.models.gorilla) this.models.gorilla.model.visible = false;
     if (this.models.monkey) this.models.monkey.model.visible = false;
+    if (this.models.box) this.models.box.model.visible = false;
+
+    if (modelType === "box") {
+      const boxData = this.models.box;
+      if (!boxData) return null;
+      boxData.model.visible = true;
+      // Static box rotated 90 degrees upwards on X axis, no self-rotation
+      boxData.model.rotation.x = -Math.PI / 2;
+      boxData.model.rotation.y = 0;
+      boxData.model.rotation.z = 0;
+      boxData.model.updateMatrixWorld(true);
+
+      this.renderer.render(this.scene, this.camera);
+      return this.renderer.domElement;
+    }
+
+    const data = this.models[modelType as keyof typeof this.models] as ModelData;
+    if (!data) return null;
 
     // Show and setup active model
     data.model.visible = true;

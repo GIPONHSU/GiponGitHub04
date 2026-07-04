@@ -807,6 +807,14 @@ export function drawUIScreen(
   }
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const cleanHex = hex.replace("#", "");
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function drawModelSelectionUI(
   ctx: CanvasRenderingContext2D,
   pStat: PlayerStats,
@@ -838,20 +846,48 @@ function drawModelSelectionUI(
   const totalW = numModels * optionWidth + (numModels - 1) * spacing;
   const startX = drawX + (barW - totalW) / 2;
 
+  // Pulse animation factor between 0.0 and 1.0 (breathing)
+  const pulse = Math.sin(Date.now() / 150) * 0.5 + 0.5;
+  const glowColor = prof.color || "#38bdf8";
+
   for (let i = 0; i < numModels; i++) {
     const optionX = startX + i * (optionWidth + spacing);
     const optionY = drawY + 30;
     const isSelected = pStat.selectedModelIndex === i;
 
     // Draw background
-    ctx.fillStyle = isSelected
-      ? "rgba(56, 189, 248, 0.2)"
-      : "rgba(30, 41, 59, 0.5)";
+    if (isSelected) {
+      const bgOpacity = 0.15 + 0.15 * pulse; // Breathes between 0.15 and 0.30
+      ctx.fillStyle = hexToRgba(glowColor, bgOpacity);
+    } else {
+      ctx.fillStyle = "rgba(30, 41, 59, 0.5)";
+    }
     ctx.fillRect(optionX, optionY, optionWidth, optionWidth);
 
-    ctx.strokeStyle = isSelected ? "#38bdf8" : "#475569";
-    ctx.lineWidth = isSelected ? 3 : 1;
-    ctx.strokeRect(optionX, optionY, optionWidth, optionWidth);
+    // Draw frame (方框) & bottom (底部)
+    if (isSelected) {
+      ctx.save();
+      
+      // Shadow glow effect
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 8 + 14 * pulse; // Breathes glow intensity
+      
+      // Border frame (方框)
+      ctx.strokeStyle = hexToRgba(glowColor, 0.6 + 0.4 * pulse); // Flashing border opacity
+      ctx.lineWidth = 2.5 + 1.5 * pulse; // Breathing border thickness
+      ctx.strokeRect(optionX, optionY, optionWidth, optionWidth);
+
+      // Glowing bottom bar (底部)
+      const bottomBarHeight = 4 + 3 * pulse; // Breathing bottom height
+      ctx.fillStyle = hexToRgba(glowColor, 0.8 + 0.2 * pulse); // High-intensity flashing opacity
+      ctx.fillRect(optionX, optionY + optionWidth - bottomBarHeight, optionWidth, bottomBarHeight);
+
+      ctx.restore();
+    } else {
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(optionX, optionY, optionWidth, optionWidth);
+    }
 
     // Draw image
     const sprite = getSelectionSprite(prof.color, prof.pilot, i + 1);
@@ -867,7 +903,7 @@ function drawModelSelectionUI(
 
     // Draw selection indicator
     if (isSelected) {
-      ctx.fillStyle = "#38bdf8";
+      ctx.fillStyle = glowColor;
       ctx.beginPath();
       ctx.moveTo(optionX + optionWidth / 2 - 8, optionY - 8);
       ctx.lineTo(optionX + optionWidth / 2 + 8, optionY - 8);

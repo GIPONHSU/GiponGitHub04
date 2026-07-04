@@ -714,15 +714,7 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
           if (Math.random() < 0.2 || hits >= 10) {
             chest.markForDeletion = true;
             SoundSystem.play("SE-Explo1");
-            EffectSystem.addParticles(
-              engine,
-              chest.x,
-              chest.y,
-              "#facc15",
-              40,
-              300,
-              12,
-            );
+            EffectSystem.spawnBoxStarExplosion(engine, chest.x, chest.y);
             
             // Grant "special armed ability" to the top
             // Placeholder: give a super state buff
