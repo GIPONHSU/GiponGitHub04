@@ -89,24 +89,22 @@ export function updateBouncingZombie(engine: GameEngine, z: Zombie, dt: number, 
                 EffectSystem.addParticles(engine, big.x, big.y, '#831843', 30, 280, 12);
                 EffectSystem.addParticles(engine, big.x, big.y, '#fbcfe8', 25, 360, 6);
 
-                // Deal damage to all players within 350px radius
+                // Deal damage to all players within 350px radius (Bypasses basic contact hit cooldown as it is a heavy earthquake)
                 engine.tops.forEach(top => {
                     if (top.markForDeletion || top.isExploding || top.hp <= 0 || (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0)) return;
                     const dist = Math.hypot(top.x - big.x, top.y - big.y);
                     if (dist <= 350) {
-                        if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
-                            const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
-                            if (!isInvulnerable) {
-                                SoundSystem.play('SE-Hurt1');
-                                top.hitCooldown = 1.0; // 1-second invulnerability protection
-                                top.flashTimer = 0.25;
-                                top.damageShockTimer = 0.45;
-                                top.spin = Math.max(10, (top.spin ?? 1000) - 300);
+                        const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
+                        if (!isInvulnerable) {
+                            SoundSystem.play('SE-Hurt1');
+                            top.hitCooldown = 1.0; // 1-second invulnerability protection
+                            top.flashTimer = 0.25;
+                            top.damageShockTimer = 0.45;
+                            top.spin = Math.max(10, (top.spin ?? 1000) - 300);
 
-                                EffectSystem.addParticles(engine, top.x, top.y, '#ef4444', 35, 450, 10);
-                            } else {
-                                EffectSystem.addParticles(engine, top.x, top.y, '#fbbf24', 25, 300, 10);
-                            }
+                            EffectSystem.addParticles(engine, top.x, top.y, '#ef4444', 35, 450, 10);
+                        } else {
+                            EffectSystem.addParticles(engine, top.x, top.y, '#fbbf24', 25, 300, 10);
                         }
 
                         if (top.isAI) {
@@ -285,22 +283,23 @@ export function updateBouncingZombie(engine: GameEngine, z: Zombie, dt: number, 
                 EffectSystem.addParticles(engine, big.x, big.y, '#be185d', 20, 300, 8);
                 EffectSystem.addParticles(engine, big.x, big.y, '#f472b6', 15, 200, 6);
 
-                // Deal damage in 120px radius
+                // Deal damage in 120px radius (Bypasses basic contact hit cooldown as it is a heavy landing smash)
                 engine.tops.forEach(top => {
                     if (top.markForDeletion || top.isExploding || top.hp <= 0 || (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0)) return;
                     const dist = Math.hypot(top.x - big.x, top.y - big.y);
                     if (dist <= 120) {
-                        if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
-                            const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
-                            if (!isInvulnerable) {
-                                SoundSystem.play('SE-Hurt1');
-                                top.hitCooldown = 1.0;
-                                top.flashTimer = 0.25;
-                                top.damageShockTimer = 0.45;
-                                top.spin = Math.max(10, (top.spin ?? 1000) - 300);
+                        const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
+                        if (!isInvulnerable) {
+                            SoundSystem.play('SE-Hurt1');
+                            top.hitCooldown = 1.0;
+                            top.flashTimer = 0.25;
+                            top.damageShockTimer = 0.45;
+                            top.spin = Math.max(10, (top.spin ?? 1000) - 300);
 
-                                EffectSystem.addParticles(engine, top.x, top.y, '#be185d', 35, 450, 10);
-                            }
+                            EffectSystem.addParticles(engine, top.x, top.y, '#be185d', 35, 450, 10);
+                        } else {
+                            // If invulnerable, show some deflect sparks
+                            EffectSystem.addParticles(engine, top.x, top.y, '#fbbf24', 25, 300, 10);
                         }
                     }
                 });

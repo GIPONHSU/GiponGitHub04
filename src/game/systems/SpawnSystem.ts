@@ -506,8 +506,8 @@ export function spawnChest(engine: GameEngine) {
   const centerY = engine.activeArenaCenterY ?? 540;
 
   for (let attempts = 0; attempts < 150; attempts++) {
-    const bx = 200 + Math.random() * (CANVAS_W - 400);
-    const by = centerY - 540 + 200 + Math.random() * (CANVAS_H - 400);
+    const bx = 400 + Math.random() * (CANVAS_W - 800);
+    const by = centerY - 540 + 250 + Math.random() * (CANVAS_H - 500);
 
     if (GameUtils.isPointInsideCapsule(engine, bx, by, 50)) {
       let bufferMultiplier = 1.0;
@@ -582,7 +582,7 @@ export function spawnChest(engine: GameEngine) {
     y: ry,
     vx: 0,
     vy: 0,
-    radius: 40,
+    radius: 60,
     mass: 999999, // Static
     markForDeletion: false,
     hitCounts: new Map<string, number>(),

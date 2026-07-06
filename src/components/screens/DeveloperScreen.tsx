@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 
 interface DeveloperScreenProps {
-  onSelect: (screen: 'fbxPreview' | 'taskList' | 'probabilityList') => void;
+  onSelect: (screen: 'fbxPreview' | 'taskList' | 'probabilityList' | 'arenaLayout' | 'spawnList' | 'formulaScreen') => void;
   onBack: () => void;
 }
 
@@ -36,10 +36,34 @@ export default function DeveloperScreen({ onSelect, onBack }: DeveloperScreenPro
           </button>
 
           <button
+            onClick={() => onSelect('formulaScreen')}
+            className="px-6 py-4 bg-slate-700 hover:bg-slate-600 text-white text-lg rounded-lg font-medium transition-colors shadow-sm flex items-center justify-between group"
+          >
+            <span>陀螺計算公式 (Top Formula)</span>
+            <span className="text-slate-400 group-hover:text-cyan-400 transition-colors">→</span>
+          </button>
+
+          <button
             onClick={() => onSelect('probabilityList')}
             className="px-6 py-4 bg-slate-700 hover:bg-slate-600 text-white text-lg rounded-lg font-medium transition-colors shadow-sm flex items-center justify-between group"
           >
             <span>機率列表 (Probability List)</span>
+            <span className="text-slate-400 group-hover:text-cyan-400 transition-colors">→</span>
+          </button>
+
+          <button
+            onClick={() => onSelect('arenaLayout')}
+            className="px-6 py-4 bg-slate-700 hover:bg-slate-600 text-white text-lg rounded-lg font-medium transition-colors shadow-sm flex items-center justify-between group"
+          >
+            <span>場地配置圖 (Arena Layout)</span>
+            <span className="text-slate-400 group-hover:text-cyan-400 transition-colors">→</span>
+          </button>
+
+          <button
+            onClick={() => onSelect('spawnList')}
+            className="px-6 py-4 bg-slate-700 hover:bg-slate-600 text-white text-lg rounded-lg font-medium transition-colors shadow-sm flex items-center justify-between group"
+          >
+            <span>單位生成列表 (Spawn Rules)</span>
             <span className="text-slate-400 group-hover:text-cyan-400 transition-colors">→</span>
           </button>
         </div>

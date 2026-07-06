@@ -8,7 +8,9 @@ const MISSION_CONFIG = {
   zombie_small: [10, 20, 30],
   zombie_big: [3, 6, 9],
   zombie_bomb: [2, 4, 6],
-  zombie_bouncing: [2, 4, 6]
+  zombie_bouncing: [2, 4, 6],
+  zombie_golden: [1, 2, 3],
+  zombie_black: [1, 2, 3]
 };
 
 const ZOMBIE_NAMES: Record<string, string> = {
@@ -16,6 +18,8 @@ const ZOMBIE_NAMES: Record<string, string> = {
   zombie_big: "巨型殭屍 (Big Zombie)",
   zombie_bomb: "炸彈殭屍 (Bomb Zombie)",
   zombie_bouncing: "彈跳殭屍 (Bouncing Zombie)",
+  zombie_golden: "黃金殭屍 (Golden Zombie)",
+  zombie_black: "黑色殭屍 (Black Zombie)",
 };
 
 export default function TaskListScreen({ onBack }: TaskListScreenProps) {

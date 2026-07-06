@@ -67,6 +67,8 @@ export class GameEngine {
     slashLines: { x1: number; y1: number; x2: number; y2: number; life: number; maxLife: number; color: string; width: number }[] = [];
     xSlashes: { x: number; y: number; size: number; maxSize: number; speed: number; angle: number; life: number; maxLife: number; color: string; thickness: number }[] = [];
     
+    lastWeaponDrawn?: number; // 0 for bullet, 1 for guard, 2 for trap
+    
     camera = {
         x: 960,
         y: 540,
@@ -984,167 +986,272 @@ export class GameEngine {
                 return;
             }
 
-            // Stuck detection (no displacement)
-            if (bt.lastX !== undefined && bt.lastY !== undefined) {
-                const distMoved = Math.hypot(bt.x - bt.lastX, bt.y - bt.lastY);
-                if (distMoved < 0.5) {
-                    bt.stuckTimer = (bt.stuckTimer || 0) + dt;
-                    if (bt.stuckTimer > 0.1) {
+            if (bt.type === 'trap_top') {
+                const orbitSpeed = 4.0; 
+                bt.orbitAngle = (bt.orbitAngle ?? 0) + orbitSpeed * dt;
+                const nextX = (bt.trapCenterX || bt.x) + Math.cos(bt.orbitAngle) * (bt.orbitIndex || 1) * bt.radius * 2;
+                const nextY = (bt.trapCenterY || bt.y) + Math.sin(bt.orbitAngle) * (bt.orbitIndex || 1) * bt.radius * 2;
+                bt.vx = realDt > 0 ? (nextX - bt.x) / realDt : 0;
+                bt.vy = realDt > 0 ? (nextY - bt.y) / realDt : 0;
+                bt.x = nextX;
+                bt.y = nextY;
+                
+                const visualSpinFactor = bt.spin / 1000;
+                bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
+                
+                if (!bt.trail) bt.trail = [];
+                bt.trail.push({ x: bt.x, y: bt.y });
+                if (bt.trail.length > 20) bt.trail.shift();
+                
+                bt.distanceMoved = bt.distanceMoved || 0;
+                bt.lastSparkDist = bt.lastSparkDist || 0;
+                bt.distanceMoved += Math.hypot(bt.vx * dt, bt.vy * dt);
+                if (bt.distanceMoved - bt.lastSparkDist >= 100) {
+                    bt.lastSparkDist = bt.distanceMoved;
+                    EffectSystem.addParticles(this, bt.x, bt.y, "#8b5cf6", 1, 100, 3, true);
+                }
+            } else if (bt.type === 'guard_top') {
+                const owner = this.tops.find(t => t.id === bt.ownerPlayerId);
+                if (owner && !owner.markForDeletion && owner.hp > 0) {
+                    const orbitSpeed = 6.0; // speed of orbit in rad/s
+                    const orbitRadius = 130;
+                    
+                    bt.orbitAngle = (bt.orbitAngle ?? 0) + orbitSpeed * dt;
+                    
+                    const nextX = owner.x + Math.cos(bt.orbitAngle) * orbitRadius;
+                    const nextY = owner.y + Math.sin(bt.orbitAngle) * orbitRadius;
+                    
+                    bt.vx = realDt > 0 ? (nextX - bt.x) / realDt : 0;
+                    bt.vy = realDt > 0 ? (nextY - bt.y) / realDt : 0;
+                    
+                    bt.x = nextX;
+                    bt.y = nextY;
+                } else {
+                    bt.markForDeletion = true;
+                    return;
+                }
+
+                // Update visual rotation angle
+                const visualSpinFactor = bt.spin / MAX_SPIN;
+                bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
+
+                // Update trail
+                if (!bt.trail) {
+                    bt.trail = [];
+                }
+                bt.trail.push({ x: bt.x, y: bt.y });
+                if (bt.trail.length > 20) {
+                    bt.trail.shift();
+                }
+
+                bt.distanceMoved = bt.distanceMoved || 0;
+                bt.lastSparkDist = bt.lastSparkDist || 0;
+                const distThisFrame = Math.hypot(bt.vx * dt, bt.vy * dt);
+                bt.distanceMoved += distThisFrame;
+
+                if (bt.distanceMoved - bt.lastSparkDist >= 100) {
+                    bt.lastSparkDist = bt.distanceMoved;
+                    EffectSystem.addParticles(this, bt.x, bt.y, "#ffff00", 1, 100, 3, true);
+                }
+
+                bt.lastX = bt.x;
+                bt.lastY = bt.y;
+            } else {
+                // Stuck detection (no displacement)
+                if (bt.lastX !== undefined && bt.lastY !== undefined) {
+                    const distMoved = Math.hypot(bt.x - bt.lastX, bt.y - bt.lastY);
+                    if (distMoved < 0.5) {
+                        bt.stuckTimer = (bt.stuckTimer || 0) + dt;
+                        if (bt.stuckTimer > 0.1) {
+                            bt.stuckTimer = 0;
+                            
+                            // Force move to another random boundary direction
+                            const centerY = this.activeArenaCenterY ?? 540;
+                            const leftCenterX = 540;
+                            const rightCenterX = 1380;
+                            const R = 480;
+
+                            const randWall = Math.floor(Math.random() * 4);
+                            let targetX = 960;
+                            let targetY = 540;
+
+                            if (randWall === 0) {
+                                targetX = leftCenterX + Math.random() * (rightCenterX - leftCenterX);
+                                targetY = centerY - R;
+                            } else if (randWall === 1) {
+                                targetX = leftCenterX + Math.random() * (rightCenterX - leftCenterX);
+                                targetY = centerY + R;
+                            } else if (randWall === 2) {
+                                const angle = Math.PI/2 + Math.random() * Math.PI;
+                                targetX = leftCenterX + Math.cos(angle) * R;
+                                targetY = centerY + Math.sin(angle) * R;
+                            } else {
+                                const angle = -Math.PI/2 + Math.random() * Math.PI;
+                                targetX = rightCenterX + Math.cos(angle) * R;
+                                targetY = centerY + Math.sin(angle) * R;
+                            }
+
+                            const dx = targetX - bt.x;
+                            const dy = targetY - bt.y;
+                            const dist = Math.hypot(dx, dy);
+                            if (dist > 0) {
+                                const targetSpeed = bt.speed || 1200;
+                                bt.vx = (dx / dist) * targetSpeed;
+                                bt.vy = (dy / dist) * targetSpeed;
+                            }
+                        }
+                    } else {
                         bt.stuckTimer = 0;
-                        
-                        // Force move to another random boundary direction
-                        const centerY = this.activeArenaCenterY ?? 540;
-                        const leftCenterX = 540;
-                        const rightCenterX = 1380;
-                        const R = 480;
-
-                        const randWall = Math.floor(Math.random() * 4);
-                        let targetX = 960;
-                        let targetY = 540;
-
-                        if (randWall === 0) {
-                            targetX = leftCenterX + Math.random() * (rightCenterX - leftCenterX);
-                            targetY = centerY - R;
-                        } else if (randWall === 1) {
-                            targetX = leftCenterX + Math.random() * (rightCenterX - leftCenterX);
-                            targetY = centerY + R;
-                        } else if (randWall === 2) {
-                            const angle = Math.PI/2 + Math.random() * Math.PI;
-                            targetX = leftCenterX + Math.cos(angle) * R;
-                            targetY = centerY + Math.sin(angle) * R;
-                        } else {
-                            const angle = -Math.PI/2 + Math.random() * Math.PI;
-                            targetX = rightCenterX + Math.cos(angle) * R;
-                            targetY = centerY + Math.sin(angle) * R;
-                        }
-
-                        const dx = targetX - bt.x;
-                        const dy = targetY - bt.y;
-                        const dist = Math.hypot(dx, dy);
-                        if (dist > 0) {
-                            const targetSpeed = bt.speed || 1200;
-                            bt.vx = (dx / dist) * targetSpeed;
-                            bt.vy = (dy / dist) * targetSpeed;
-                        }
                     }
                 } else {
                     bt.stuckTimer = 0;
                 }
-            } else {
-                bt.stuckTimer = 0;
-            }
-            bt.lastX = bt.x;
-            bt.lastY = bt.y;
+                bt.lastX = bt.x;
+                bt.lastY = bt.y;
 
-            // Update trail coordinates for trail renderers
-            if (!bt.trail) {
-                bt.trail = [];
-            }
-            bt.trail.push({ x: bt.x, y: bt.y });
-            if (bt.trail.length > 20) {
-                bt.trail.shift();
-            }
-
-            bt.distanceMoved = bt.distanceMoved || 0;
-            bt.lastSparkDist = bt.lastSparkDist || 0;
-            
-            const visualSpinFactor = bt.spin / MAX_SPIN;
-            bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
-
-            const distThisFrame = Math.hypot(bt.vx * dt, bt.vy * dt);
-            bt.distanceMoved += distThisFrame;
-
-            if (bt.distanceMoved - bt.lastSparkDist >= 100) {
-                bt.lastSparkDist = bt.distanceMoved;
-                EffectSystem.addParticles(this, bt.x, bt.y, "#ffff00", 1, 100, 3, true);
-            }
-
-            bt.x += bt.vx * dt;
-            bt.y += bt.vy * dt;
-
-            // Bounce on concrete blocks
-            this.concreteBlocks.forEach(block => {
-                if (!block.markForDeletion && checkCircleBoxCollision(bt as any, block)) {
-                    const oldVx = bt.vx;
-                    const oldVy = bt.vy;
-                    const res = resolveCircleBoxCollision(bt as any, block, 1.0);
-                    if (res) {
-                        const collisionX = bt.x - res.nx * bt.radius;
-                        const collisionY = bt.y - res.ny * bt.radius;
-                        EffectSystem.addChainsawSparkParticles(this, collisionX, collisionY, res.nx, res.ny, 18);
-                    }
-                    if (bt.vx !== oldVx || bt.vy !== oldVy) {
-                        this.redirectBulletTopToNearestElite(bt);
-                    }
+                // Update trail coordinates for trail renderers
+                if (!bt.trail) {
+                    bt.trail = [];
                 }
-            });
-
-            // Bounce on other player tops (elastic collision rebound)
-            // BulletTops do not have HP and only self-destruct when their 15-second timer expires.
-            // Other tops will not suffer HP or spin reduction when colliding with BulletTops.
-            this.tops.forEach(top => {
-                if (top.markForDeletion || top.hp <= 0) return;
-
-                const dx = top.x - bt.x;
-                const dy = top.y - bt.y;
-                const dist = Math.hypot(dx, dy);
-                const minDist = bt.radius + top.radius;
-
-                if (dist < minDist && dist > 0) {
-                    const nx = dx / dist;
-                    const ny = dy / dist;
-
-                    // Push apart to prevent overlap
-                    const overlap = minDist - dist;
-                    bt.x -= nx * overlap * 0.5;
-                    bt.y -= ny * overlap * 0.5;
-                    top.x += nx * overlap * 0.5;
-                    top.y += ny * overlap * 0.5;
-
-                    // Rebound velocities
-                    const rvx = top.vx - bt.vx;
-                    const rvy = top.vy - bt.vy;
-                    const velAlongNormal = rvx * nx + rvy * ny;
-
-                    if (velAlongNormal < 0) {
-                        const bounciness = 0.95;
-                        const impulseScalar = -(1 + bounciness) * velAlongNormal;
-                        const impulseX = impulseScalar * nx;
-                        const impulseY = impulseScalar * ny;
-
-                        bt.vx -= impulseX * 0.5;
-                        bt.vy -= impulseY * 0.5;
-                        top.vx += impulseX * 0.5;
-                        top.vy += impulseY * 0.5;
-
-                        // Sound & spark effects
-                        SoundSystem.play("Attack_Punch_024");
-                        const midX = (bt.x + top.x) / 2;
-                        const midY = (bt.y + top.y) / 2;
-                        EffectSystem.addParticles(this, midX, midY, top.color, 8, 160, 4);
-                        EffectSystem.addParticles(this, midX, midY, '#ffffff', 4, 200, 3);
-
-                        this.redirectBulletTopToNearestElite(bt);
-                    }
+                bt.trail.push({ x: bt.x, y: bt.y });
+                if (bt.trail.length > 20) {
+                    bt.trail.shift();
                 }
-            });
 
-            // Bounce on wall
-            const oldVx = bt.vx;
-            const oldVy = bt.vy;
-            const wallBounced = CollisionSystem.handleWallBounce(this, bt as any);
-            if (wallBounced || bt.vx !== oldVx || bt.vy !== oldVy) {
-                this.redirectBulletTopToNearestElite(bt);
+                bt.distanceMoved = bt.distanceMoved || 0;
+                bt.lastSparkDist = bt.lastSparkDist || 0;
+                
+                const visualSpinFactor = bt.spin / MAX_SPIN;
+                bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
+
+                const distThisFrame = Math.hypot(bt.vx * dt, bt.vy * dt);
+                bt.distanceMoved += distThisFrame;
+
+                if (bt.distanceMoved - bt.lastSparkDist >= 100) {
+                    bt.lastSparkDist = bt.distanceMoved;
+                    EffectSystem.addParticles(this, bt.x, bt.y, "#ffff00", 1, 100, 3, true);
+                }
+
+                bt.x += bt.vx * dt;
+                bt.y += bt.vy * dt;
             }
+
+            if (bt.type !== 'guard_top' && bt.type !== 'trap_top') {
+                // Bounce on concrete blocks
+                this.concreteBlocks.forEach(block => {
+                    if (!block.markForDeletion && checkCircleBoxCollision(bt as any, block)) {
+                        const oldVx = bt.vx;
+                        const oldVy = bt.vy;
+                        const res = resolveCircleBoxCollision(bt as any, block, 1.0);
+                        if (res) {
+                            const collisionX = bt.x - res.nx * bt.radius;
+                            const collisionY = bt.y - res.ny * bt.radius;
+                            EffectSystem.addChainsawSparkParticles(this, collisionX, collisionY, res.nx, res.ny, 18);
+                        }
+                        if (bt.vx !== oldVx || bt.vy !== oldVy) {
+                            this.redirectBulletTopToNearestElite(bt);
+                        }
+                    }
+                });
+
+                // Bounce on other player tops (elastic collision rebound)
+                // BulletTops do not have HP and only self-destruct when their 15-second timer expires.
+                // Other tops will not suffer HP or spin reduction when colliding with BulletTops.
+                this.tops.forEach(top => {
+                    if (top.markForDeletion || top.hp <= 0) return;
+
+                    const dx = top.x - bt.x;
+                    const dy = top.y - bt.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = bt.radius + top.radius;
+
+                    if (dist < minDist && dist > 0) {
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+
+                        // Push apart to prevent overlap
+                        const overlap = minDist - dist;
+                        bt.x -= nx * overlap * 0.5;
+                        bt.y -= ny * overlap * 0.5;
+                        top.x += nx * overlap * 0.5;
+                        top.y += ny * overlap * 0.5;
+
+                        // Rebound velocities
+                        const rvx = top.vx - bt.vx;
+                        const rvy = top.vy - bt.vy;
+                        const velAlongNormal = rvx * nx + rvy * ny;
+
+                        if (velAlongNormal < 0) {
+                            const bounciness = 0.95;
+                            const impulseScalar = -(1 + bounciness) * velAlongNormal;
+                            const impulseX = impulseScalar * nx;
+                            const impulseY = impulseScalar * ny;
+
+                            bt.vx -= impulseX * 0.5;
+                            bt.vy -= impulseY * 0.5;
+                            top.vx += impulseX * 0.5;
+                            top.vy += impulseY * 0.5;
+
+                            // Sound & spark effects
+                            SoundSystem.play("Attack_Punch_024");
+                            const midX = (bt.x + top.x) / 2;
+                            const midY = (bt.y + top.y) / 2;
+                            EffectSystem.addParticles(this, midX, midY, top.color, 8, 160, 4);
+                            EffectSystem.addParticles(this, midX, midY, '#ffffff', 4, 200, 3);
+
+                            this.redirectBulletTopToNearestElite(bt);
+                        }
+                    }
+                });
+
+                // Bounce on wall
+                const oldVx = bt.vx;
+                const oldVy = bt.vy;
+                const wallBounced = CollisionSystem.handleWallBounce(this, bt as any);
+                if (wallBounced || bt.vx !== oldVx || bt.vy !== oldVy) {
+                    this.redirectBulletTopToNearestElite(bt);
+                }
+            }
+
+            if (bt.type === 'trap_top' && bt.orbitIndex !== 1) {
+                return;
+            }
+
+            let isTrapTopLine = false;
+            let startX = 0, startY = 0, endX = 0, endY = 0;
+            if (bt.type === 'trap_top') {
+                isTrapTopLine = true;
+                const angle = bt.orbitAngle || 0;
+                startX = (bt.trapCenterX || bt.x) + Math.cos(angle) * 40;
+                startY = (bt.trapCenterY || bt.y) + Math.sin(angle) * 40;
+                endX = (bt.trapCenterX || bt.x) + Math.cos(angle) * 320;
+                endY = (bt.trapCenterY || bt.y) + Math.sin(angle) * 320;
+            }
+
+            // Removed collision with player tops for trap_top
 
             // Collide with zombies (push and damage)
             this.zombies.forEach(z => {
                 if (z.markForDeletion || z.hp <= 0 || (z as any).isSiegeZombie) return;
                 
-                const dx = z.x - bt.x;
-                const dy = z.y - bt.y;
-                const dist = Math.hypot(dx, dy);
-                const minDist = bt.radius + z.radius;
+                let dx = z.x - bt.x;
+                let dy = z.y - bt.y;
+                let dist = Math.hypot(dx, dy);
+                let minDist = bt.radius + z.radius;
+                
+                let cx = bt.x;
+                let cy = bt.y;
+
+                if (isTrapTopLine) {
+                    const l2 = (endX - startX) ** 2 + (endY - startY) ** 2;
+                    let t = ((z.x - startX) * (endX - startX) + (z.y - startY) * (endY - startY)) / l2;
+                    t = Math.max(0, Math.min(1, t));
+                    cx = startX + t * (endX - startX);
+                    cy = startY + t * (endY - startY);
+                    dx = z.x - cx;
+                    dy = z.y - cy;
+                    dist = Math.hypot(dx, dy);
+                }
 
                 if (dist < minDist) {
                     // check hit cooldown
@@ -1152,23 +1259,23 @@ export class GameEngine {
                     if (this.timeElapsed - lastHit > 0.3) {
                         bt.hitCooldowns.set(z.id, this.timeElapsed);
                         
-                        // Push away
+                        // Push away to prevent overlap (always)
                         const pushDist = minDist - dist;
                         const pushX = (dx / dist) * pushDist;
                         const pushY = (dy / dist) * pushDist;
                         z.x += pushX;
                         z.y += pushY;
                         
+                        const angle = Math.atan2(z.y - cy, z.x - cx);
+                        const contactX = cx + Math.cos(angle) * bt.radius;
+                        const contactY = cy + Math.sin(angle) * bt.radius;
+
                         z.vx = (dx / dist) * 600;
                         z.vy = (dy / dist) * 600;
                         z.bounceTimer = 0.5;
                         z.maxBounceTimer = 0.5;
-                        
-                        const angle = Math.atan2(z.y - bt.y, z.x - bt.x);
-                        const contactX = bt.x + Math.cos(angle) * bt.radius;
-                        const contactY = bt.y + Math.sin(angle) * bt.radius;
 
-                        // 3.「子彈陀螺」每次碰撞到敵人時，要額外乘以50%機率去決定該下碰撞傷害是否成立，若成立，才會進行敵人擊殺機率運算。
+                        // 3.「子彈陀螺」/「陷阱陀螺」每次碰撞到敵人時，要額外乘以50%機率去決定該下碰撞傷害是否成立，若成立，才會進行敵人擊殺機率運算。
                         if (Math.random() < 0.5) {
                             const ownerId = bt.ownerPlayerId || "top_0";
                             (z as any).lastKillerId = ownerId;
@@ -1196,8 +1303,8 @@ export class GameEngine {
                             }
                             EffectSystem.addParticles(this, contactX, contactY, mainColor, 8, 160, 4);
                             EffectSystem.addParticles(this, contactX, contactY, '#ffffff', 4, 200, 3);
-                            SoundSystem.play("Attack_Punch_024");
-
+                            SoundSystem.play("Attack_Slash_020");
+                            
                             // Check if zombie is killed (hp <= 0)
                             if (z.hp <= 0) {
                                 const isAlreadyDying = (z as any).isDying;
@@ -1243,16 +1350,18 @@ export class GameEngine {
                 }
             });
 
-            // 1. 保證「子彈陀螺」的移動速度在過程中都不會減弱
-            const speed = Math.hypot(bt.vx, bt.vy);
-            const targetSpeed = bt.speed || 1200;
-            if (speed > 0) {
-                bt.vx = (bt.vx / speed) * targetSpeed;
-                bt.vy = (bt.vy / speed) * targetSpeed;
-            } else {
-                const randomAngle = Math.random() * Math.PI * 2;
-                bt.vx = Math.cos(randomAngle) * targetSpeed;
-                bt.vy = Math.sin(randomAngle) * targetSpeed;
+            if (bt.type !== 'guard_top' && bt.type !== 'trap_top') {
+                // 1. 保證「子彈陀螺」的移動速度在過程中都不會減弱
+                const speed = Math.hypot(bt.vx, bt.vy);
+                const targetSpeed = bt.speed || 1200;
+                if (speed > 0) {
+                    bt.vx = (bt.vx / speed) * targetSpeed;
+                    bt.vy = (bt.vy / speed) * targetSpeed;
+                } else {
+                    const randomAngle = Math.random() * Math.PI * 2;
+                    bt.vx = Math.cos(randomAngle) * targetSpeed;
+                    bt.vy = Math.sin(randomAngle) * targetSpeed;
+                }
             }
         });
 
@@ -1260,9 +1369,11 @@ export class GameEngine {
         for (let i = 0; i < this.bulletTops.length; i++) {
             const bt1 = this.bulletTops[i];
             if (bt1.markForDeletion) continue;
+            if (bt1.type === 'guard_top' || bt1.type === 'trap_top') continue;
             for (let j = i + 1; j < this.bulletTops.length; j++) {
                 const bt2 = this.bulletTops[j];
                 if (bt2.markForDeletion) continue;
+                if (bt2.type === 'guard_top' || bt2.type === 'trap_top') continue;
 
                 const dx = bt2.x - bt1.x;
                 const dy = bt2.y - bt1.y;
@@ -2174,8 +2285,8 @@ export class GameEngine {
             }
 
             const hasChest = this.obstacles.some(o => o.type === 'obstacle_chest' && !o.markForDeletion);
-            const hasBulletTops = this.bulletTops.some(bt => !bt.markForDeletion);
-            if (!hasChest && !hasBulletTops) {
+            const hasSpecialWeapons = this.bulletTops.some(bt => !bt.markForDeletion);
+            if (!hasChest && !hasSpecialWeapons) {
                 this.chestSpawnTimer += dt;
             }
             if (this.chestSpawnTimer > 20.0) {
@@ -4685,6 +4796,7 @@ export class GameEngine {
                             block.durability = (block.durability ?? 5) - 1;
                             block.flashTimer = 0.15; // Set flash timer to 150ms
                             blockExtra.hitCooldown = 0.25; // 250ms collision invulnerability window to prevent multi-hit overlapping
+                            SoundSystem.play('SE-Sheild1');
                             
                             // Visual impact effects (stone fragments / dust) - generated at the precise edge contact point
                             const cX = e.x - res.nx * e.radius;

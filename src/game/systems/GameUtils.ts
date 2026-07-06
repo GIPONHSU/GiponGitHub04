@@ -57,13 +57,15 @@ const MISSION_CONFIG = {
     zombie_small: [10, 20, 30],
     zombie_big: [3, 6, 9],
     zombie_bomb: [2, 4, 6],
-    zombie_bouncing: [2, 4, 6]
+    zombie_bouncing: [2, 4, 6],
+    zombie_golden: [1, 2, 3],
+    zombie_black: [1, 2, 3]
 };
 
 function addRandomMission(top: Top) {
     const activeTypes = top.missions!.map(m => m.targetType);
     
-    const allTypes = ['zombie_small', 'zombie_big', 'zombie_bomb', 'zombie_bouncing'] as const;
+    const allTypes = ['zombie_small', 'zombie_big', 'zombie_bomb', 'zombie_bouncing', 'zombie_golden', 'zombie_black'] as const;
     
     // First, try to find types that are not currently active AND haven't reached their max tier
     let availableTypes = allTypes.filter(t => {
@@ -99,7 +101,7 @@ function addRandomMission(top: Top) {
 
 export function initializeTopMissions(top: Top) {
     if (!top.missionTiers) {
-        top.missionTiers = { zombie_small: 0, zombie_big: 0, zombie_bomb: 0, zombie_bouncing: 0 };
+        top.missionTiers = { zombie_small: 0, zombie_big: 0, zombie_bomb: 0, zombie_bouncing: 0, zombie_golden: 0, zombie_black: 0 };
     }
     if (!top.missions) {
         top.missions = [];

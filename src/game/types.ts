@@ -134,7 +134,7 @@ export interface Top extends Entity {
     spinTutorialTimer?: number;
     spinTutorialSpun?: boolean;
     missions?: {
-        targetType: 'zombie_small' | 'zombie_big' | 'zombie_bomb' | 'zombie_bouncing';
+        targetType: 'zombie_small' | 'zombie_big' | 'zombie_bomb' | 'zombie_bouncing' | 'zombie_golden' | 'zombie_black';
         targetCount: number;
         currentCount: number;
         completed: boolean;
@@ -146,6 +146,8 @@ export interface Top extends Entity {
         zombie_big: number;
         zombie_bomb: number;
         zombie_bouncing: number;
+        zombie_golden: number;
+        zombie_black: number;
     };
     rainbowSuperTimer?: number;
 }
@@ -319,6 +321,11 @@ export interface BulletTop {
     spiralStartAngle?: number;
     spiralTimer?: number;
     spiralDir?: number;
+    orbitAngle?: number;
+    orbitRadius?: number;
+    orbitIndex?: number;
+    trapCenterX?: number;
+    trapCenterY?: number;
 }
 
 export interface PhantomClone {

@@ -330,8 +330,10 @@ export function drawEntities(
         const hue = (time * 60) % 360;
 
         // Apply a highly polished, glowing outer drop shadow that matches the exact shape of the box
+        // Base glow is proportional to chest radius. Pulse/expansion amplitude is 50% of the base glow radius.
+        const baseGlow = 31.2 * (o.radius / 40);
         ctx.shadowColor = `hsla(${hue}, 100%, 60%, 1)`;
-        ctx.shadowBlur = 31.2 + Math.sin(time * 2) * 7.8; // Dynamic pulsing outer glow radius (increased by 30%)
+        ctx.shadowBlur = baseGlow + Math.sin(time * 2) * (baseGlow * 0.5);
 
         if (o.flashTimer !== undefined && o.flashTimer > 0) {
           ctx.filter = "brightness(0) invert(1)";
@@ -354,14 +356,19 @@ export function drawEntities(
 
     ctx.save();
     let spr = sprites["barrel"];
+    let sprW = spr.width;
+    let sprH = spr.height;
     if (o.type === "obstacle_chest") {
       spr = sprites["chest"];
+      const scale = o.radius / 40; // Scale up proportionally (e.g. 1.5 when radius is 60)
+      sprW = spr.width * scale;
+      sprH = spr.height * scale;
     }
 
     if (o.flashTimer !== undefined && o.flashTimer > 0) {
       ctx.filter = "brightness(0) invert(1)";
     }
-    ctx.drawImage(spr, o.x - spr.width / 2, o.y - spr.height / 2);
+    ctx.drawImage(spr, o.x - sprW / 2, o.y - sprH / 2, sprW, sprH);
     if (o.flashTimer !== undefined && o.flashTimer > 0) {
       ctx.filter = "none";
     }
@@ -2848,7 +2855,82 @@ export function drawEntities(
 
   // Draw BulletTops Trail
   engine.bulletTops.forEach((bt) => {
-    if (bt.trail && bt.trail.length > 1) {
+    const owner = engine.tops.find(t => t.id === bt.ownerPlayerId);
+    if (owner && bt.orbitAngle !== undefined && bt.orbitRadius !== undefined) {
+      ctx.save();
+      
+      // Use screen composition for premium additive neon glowing effects
+      ctx.globalCompositeOperation = "screen";
+
+      const currentAngle = bt.orbitAngle;
+      const orbitRadius = bt.orbitRadius;
+      const trailLength = 20;
+      const arcLength = 2.5; // radians (about 143 degrees of trail)
+
+      // 1. Draw glowing outer rainbow aura trail
+      const rainbowColors = [
+        "rgba(255, 0, 0, ",
+        "rgba(255, 127, 0, ",
+        "rgba(255, 255, 0, ",
+        "rgba(0, 255, 0, ",
+        "rgba(0, 0, 255, ",
+        "rgba(139, 0, 255, "
+      ];
+      for (let i = 0; i < trailLength - 1; i++) {
+        const ratio = i / (trailLength - 1); // 0.0 (oldest) to 1.0 (newest)
+        const ratioNext = (i + 1) / (trailLength - 1);
+        
+        const angle1 = currentAngle - arcLength * (1 - ratio);
+        const p1x = owner.x + Math.cos(angle1) * orbitRadius;
+        const p1y = owner.y + Math.sin(angle1) * orbitRadius;
+        
+        const angle2 = currentAngle - arcLength * (1 - ratioNext);
+        const p2x = owner.x + Math.cos(angle2) * orbitRadius;
+        const p2y = owner.y + Math.sin(angle2) * orbitRadius;
+        
+        const opacity = ratio * 0.65; // fades out towards oldest points
+        const thickness = ratio * bt.radius * 0.75; // tapers down towards tail
+        
+        ctx.strokeStyle = rainbowColors[i % rainbowColors.length] + opacity + ")";
+        ctx.lineWidth = Math.max(4, thickness);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
+        ctx.beginPath();
+        ctx.moveTo(p1x, p1y);
+        ctx.lineTo(p2x, p2y);
+        ctx.stroke();
+      }
+
+      // 2. Draw a bright white-hot center line for the axis trail
+      for (let i = 0; i < trailLength - 1; i++) {
+        const ratio = i / (trailLength - 1);
+        const ratioNext = (i + 1) / (trailLength - 1);
+        
+        const angle1 = currentAngle - arcLength * (1 - ratio);
+        const p1x = owner.x + Math.cos(angle1) * orbitRadius;
+        const p1y = owner.y + Math.sin(angle1) * orbitRadius;
+        
+        const angle2 = currentAngle - arcLength * (1 - ratioNext);
+        const p2x = owner.x + Math.cos(angle2) * orbitRadius;
+        const p2y = owner.y + Math.sin(angle2) * orbitRadius;
+        
+        const opacity = ratio * 0.9;
+        const thickness = ratio * bt.radius * 0.22; // much thinner white-hot core
+        
+        ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.lineWidth = Math.max(2, thickness);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
+        ctx.beginPath();
+        ctx.moveTo(p1x, p1y);
+        ctx.lineTo(p2x, p2y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    } else if (bt.trail && bt.trail.length > 1) {
       ctx.save();
       
       // Use screen composition for premium additive neon glowing effects

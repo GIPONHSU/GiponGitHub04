@@ -330,89 +330,6 @@ export function drawUIWorld(ctx: CanvasRenderingContext2D, engine: GameEngine) {
     if (player) {
       const midX = (bossStruggle.x + player.x) / 2;
       const midY = (bossStruggle.y + player.y) / 2;
-      const currentR = bossStruggle.radius + player.radius - 8;
-
-      // Draw collision clash ring effect exactly like versus mode
-      ctx.save();
-      ctx.globalCompositeOperation = "screen";
-
-      // 1. 底層大氣漫射發光 (Purple & Pink glow)
-      const gradRadius = currentR * 1.4;
-      const radialGrad = ctx.createRadialGradient(
-        midX,
-        midY,
-        currentR * 0.4,
-        midX,
-        midY,
-        gradRadius,
-      );
-      radialGrad.addColorStop(0, "rgba(168, 85, 247, 0.35)"); // 紫光核心
-      radialGrad.addColorStop(0.5, "rgba(236, 72, 153, 0.2)"); // 粉紅擴散
-      radialGrad.addColorStop(1, "rgba(59, 130, 246, 0.0)");
-      ctx.fillStyle = radialGrad;
-      ctx.beginPath();
-      ctx.arc(midX, midY, gradRadius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 呼吸震盪係數
-      const pulse = 0.8 + 0.2 * Math.sin(Date.now() / 150);
-
-      // 2. 外圍厚實衝擊主能環
-      ctx.beginPath();
-      ctx.arc(midX, midY, currentR, 0, Math.PI * 2);
-      ctx.strokeStyle = "#a855f7";
-      ctx.lineWidth = 14 * pulse;
-      ctx.globalAlpha = 0.45;
-      ctx.stroke();
-
-      // 3. 極細高溫科技核心線
-      ctx.beginPath();
-      ctx.arc(midX, midY, currentR, 0, Math.PI * 2);
-      ctx.strokeStyle = "#22d3ee"; // 青空電鍍藍
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = 0.95;
-      ctx.stroke();
-
-      // 4. 熱力最內層白灼絲
-      ctx.beginPath();
-      ctx.arc(midX, midY, currentR, 0, Math.PI * 2);
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.95;
-      ctx.stroke();
-
-      // 5. 旋轉能量刻度線 (Dash Gap Ring)
-      ctx.save();
-      ctx.strokeStyle = "#ec4899";
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = 0.8 * pulse;
-      ctx.setLineDash([20, 15, 6, 15]);
-      ctx.lineDashOffset = (Date.now() / 45) % 360; // 高速旋轉刻度
-      ctx.beginPath();
-      ctx.arc(midX, midY, currentR + 10, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-
-      // 6. 星軌亮點點綴軌跡 (Energy Nodes)
-      const numNodes = 8;
-      for (let i = 0; i < numNodes; i++) {
-        const angleOffset = (Date.now() / 1200) % (Math.PI * 2);
-        const angle = (i * (Math.PI * 2)) / numNodes + angleOffset;
-        const nodeX = midX + Math.cos(angle) * currentR;
-        const nodeY = midY + Math.sin(angle) * currentR;
-
-        ctx.beginPath();
-        ctx.arc(
-          nodeX,
-          nodeY,
-          6 + Math.sin(Date.now() / 100 + i) * 2,
-          0,
-          Math.PI * 2,
-        );
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
-      }
-      ctx.restore();
 
       // ==========================================
       // 7. 對決力量拉鋸計量表 (Tug-of-War Bar)
@@ -1380,6 +1297,7 @@ export function drawUI(ctx: CanvasRenderingContext2D, engine: GameEngine) {
 
         let iconColor = "#ffffff";
         let iconText = "";
+        let iconTextColor = "#ffffff";
         if (mission.targetType === "zombie_small") {
           iconColor = "#22c55e";
           iconText = "小";
@@ -1392,20 +1310,30 @@ export function drawUI(ctx: CanvasRenderingContext2D, engine: GameEngine) {
         } else if (mission.targetType === "zombie_bouncing") {
           iconColor = "#be185d";
           iconText = "粉";
+        } else if (mission.targetType === "zombie_golden") {
+          iconColor = "#fbbf24";
+          iconText = "金";
+        } else if (mission.targetType === "zombie_black") {
+          iconColor = "#1f2937";
+          iconText = "黑";
         }
 
         ctx.beginPath();
         ctx.arc(sX + 22, sY + slotH / 2, 12, 0, Math.PI * 2);
         ctx.fillStyle = iconColor;
         ctx.fill();
-        ctx.strokeStyle = "#000000";
+        if (mission.targetType === "zombie_black") {
+          ctx.strokeStyle = "#ffffff";
+        } else {
+          ctx.strokeStyle = "#000000";
+        }
         ctx.lineWidth = 2;
         ctx.stroke();
 
         ctx.font = 'bold 13px "Microsoft JhengHei", "Courier New"';
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = iconTextColor;
         ctx.fillText(iconText, sX + 22, sY + slotH / 2 + 1);
 
         ctx.font = 'bold 18px "Courier New"';

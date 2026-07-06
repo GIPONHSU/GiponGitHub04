@@ -18,12 +18,15 @@ import FBXPreviewScreen from './components/screens/FBXPreviewScreen';
 import DeveloperScreen from './components/screens/DeveloperScreen';
 import TaskListScreen from './components/screens/TaskListScreen';
 import ProbabilityListScreen from './components/screens/ProbabilityListScreen';
+import ArenaLayoutScreen from './components/screens/ArenaLayoutScreen';
+import SpawnListScreen from './components/screens/SpawnListScreen';
+import TopFormulaScreen from './components/screens/TopFormulaScreen';
 import ApexMomentumBgm from './BGM/Apex_Momentum.mp3';
 import { isSkillKey, isDirectionKey } from './constants/ui';
 import { SoundSystem } from './game/systems/SoundSystem';
 
 export default function App() {
-  const [status, setStatus] = useState<'modeSelect' | 'menu' | 'loading' | 'playing' | 'gameover' | 'results' | 'fbxPreview' | 'developer' | 'taskList' | 'probabilityList'>('modeSelect');
+  const [status, setStatus] = useState<'modeSelect' | 'menu' | 'loading' | 'playing' | 'gameover' | 'results' | 'fbxPreview' | 'developer' | 'taskList' | 'probabilityList' | 'arenaLayout' | 'spawnList' | 'formulaScreen'>('modeSelect');
   const [gameMode, setGameMode] = useState<'campaign' | 'versus'>('campaign');
   const [energyPerCoin, setEnergyPerCoin] = useState(10);
   const [joined, setJoined] = useState<boolean[]>([false, false, false, false]);
@@ -40,7 +43,7 @@ export default function App() {
   const shouldPlayMenuBgm = status === 'modeSelect' || status === 'menu' || status === 'loading';
 
   useEffect(() => {
-    const isDeveloperMode = ['developer', 'fbxPreview', 'taskList', 'probabilityList'].includes(status);
+    const isDeveloperMode = ['developer', 'fbxPreview', 'taskList', 'probabilityList', 'arenaLayout', 'spawnList', 'formulaScreen'].includes(status);
     if (isDeveloperMode) {
       document.body.classList.add('show-cursor');
       document.body.classList.remove('hide-cursor');
@@ -266,6 +269,12 @@ export default function App() {
         return <TaskListScreen onBack={() => setStatus('developer')} />;
       case 'probabilityList':
         return <ProbabilityListScreen onBack={() => setStatus('developer')} />;
+      case 'arenaLayout':
+        return <ArenaLayoutScreen onBack={() => setStatus('developer')} />;
+      case 'spawnList':
+        return <SpawnListScreen onBack={() => setStatus('developer')} />;
+      case 'formulaScreen':
+        return <TopFormulaScreen onBack={() => setStatus('developer')} />;
       default:
         return null;
     }

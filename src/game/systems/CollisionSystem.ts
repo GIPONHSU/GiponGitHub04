@@ -689,6 +689,7 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
         }
       } else if (a.type === "obstacle_chest" || b.type === "obstacle_chest") {
         const chest = (a.type === "obstacle_chest" ? a : b) as Obstacle;
+        if (chest.markForDeletion) return;
         const other = a.type === "obstacle_chest" ? b : a;
 
         // If a zombie/monster touches the chest, it does not trigger any hit
@@ -708,93 +709,193 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
           chest.hitCounts.set(topOther.id, hits);
 
           chest.flashTimer = 0.15;
-          SoundSystem.play("Attack_Punch_024");
+          SoundSystem.play("SE-Sheild1");
           
           // 1/5 chance or guaranteed on 10th hit
           if (Math.random() < 0.2 || hits >= 10) {
             chest.markForDeletion = true;
-            SoundSystem.play("SE-Explo1");
+            SoundSystem.play("SE-Heal1");
             EffectSystem.spawnBoxStarExplosion(engine, chest.x, chest.y);
             
             // Grant "special armed ability" to the top
             // Placeholder: give a super state buff
             topOther.superTimer = (topOther.superTimer || 0) + 5; 
             
-            // Spawn TWO BulletTops at the chest's position (moving in opposite directions after spiral)
-            const btSpeed = 1200; // Fast moving (increased by 3x)
-            const angle1 = Math.random() * Math.PI * 2;
-            
-            engine.bulletTops.push({
-                id: "bt_" + Math.random(),
-                type: 'bullet_top',
-                x: chest.x,
-                y: chest.y,
-                vx: Math.cos(angle1) * btSpeed,
-                vy: Math.sin(angle1) * btSpeed,
-                radius: 40, // 100% of normal top (which is 40)
-                mass: 1.5,
-                life: 15, // 15 seconds
-                maxLife: 15,
-                angle: 0,
-                spin: MAX_SPIN,
-                hitCooldowns: new Map<string, number>(),
-                speed: btSpeed,
-                ownerPlayerId: topOther.id,
-                isSpiraling: true,
-                spiralCenterX: chest.x,
-                spiralCenterY: chest.y,
-                spiralStartAngle: angle1,
-                spiralTimer: 0,
-                spiralDir: 1
-            });
+            let randomWeapon = (engine.lastWeaponDrawn === undefined) ? 0 : (engine.lastWeaponDrawn + 1) % 3;
+            engine.lastWeaponDrawn = randomWeapon;
 
-            const angle2 = angle1 + Math.PI;
-            engine.bulletTops.push({
-                id: "bt_" + Math.random(),
-                type: 'bullet_top',
-                x: chest.x,
-                y: chest.y,
-                vx: Math.cos(angle2) * btSpeed,
-                vy: Math.sin(angle2) * btSpeed,
-                radius: 40, // 100% of normal top (which is 40)
-                mass: 1.5,
-                life: 15, // 15 seconds
-                maxLife: 15,
-                angle: 0,
-                spin: MAX_SPIN,
-                hitCooldowns: new Map<string, number>(),
-                speed: btSpeed,
-                ownerPlayerId: topOther.id,
-                isSpiraling: true,
-                spiralCenterX: chest.x,
-                spiralCenterY: chest.y,
-                spiralStartAngle: angle2,
-                spiralTimer: 0,
-                spiralDir: 1
-            });
+            if (randomWeapon === 0) {
+                // Spawn TWO BulletTops at the chest's position (moving in opposite directions after spiral)
+                const btSpeed = 1200; // Fast moving (increased by 3x)
+                const angle1 = Math.random() * Math.PI * 2;
+                
+                engine.bulletTops.push({
+                    id: "bt_" + Math.random(),
+                    type: 'bullet_top',
+                    x: chest.x,
+                    y: chest.y,
+                    vx: Math.cos(angle1) * btSpeed,
+                    vy: Math.sin(angle1) * btSpeed,
+                    radius: 40, // 100% of normal top (which is 40)
+                    mass: 1.5,
+                    life: 15, // 15 seconds
+                    maxLife: 15,
+                    angle: 0,
+                    spin: MAX_SPIN,
+                    hitCooldowns: new Map<string, number>(),
+                    speed: btSpeed,
+                    ownerPlayerId: topOther.id,
+                    isSpiraling: true,
+                    spiralCenterX: chest.x,
+                    spiralCenterY: chest.y,
+                    spiralStartAngle: angle1,
+                    spiralTimer: 0,
+                    spiralDir: 1
+                });
 
-            EffectSystem.addParticles(
-              engine,
-              topOther.x,
-              topOther.y,
-              "#3b82f6",
-              30,
-              400,
-              8,
-            );
-            
-            engine.floatingTexts.push({
-              id: "ft_" + Math.random(),
-              x: chest.x,
-              y: chest.y - 40,
-              text: "啟動子彈陀螺!",
-              color: "#fbbf24", // Gold color, same as 任務達成!
-              life: 1.9,
-              maxLife: 1.9,
-              vy: -30,
-              style: "armed_acquired"
-            });
+                const angle2 = angle1 + Math.PI;
+                engine.bulletTops.push({
+                    id: "bt_" + Math.random(),
+                    type: 'bullet_top',
+                    x: chest.x,
+                    y: chest.y,
+                    vx: Math.cos(angle2) * btSpeed,
+                    vy: Math.sin(angle2) * btSpeed,
+                    radius: 40, // 100% of normal top (which is 40)
+                    mass: 1.5,
+                    life: 15, // 15 seconds
+                    maxLife: 15,
+                    angle: 0,
+                    spin: MAX_SPIN,
+                    hitCooldowns: new Map<string, number>(),
+                    speed: btSpeed,
+                    ownerPlayerId: topOther.id,
+                    isSpiraling: true,
+                    spiralCenterX: chest.x,
+                    spiralCenterY: chest.y,
+                    spiralStartAngle: angle2,
+                    spiralTimer: 0,
+                    spiralDir: 1
+                });
 
+                EffectSystem.addParticles(
+                  engine,
+                  topOther.x,
+                  topOther.y,
+                  "#3b82f6",
+                  30,
+                  400,
+                  8,
+                );
+                
+                engine.floatingTexts.push({
+                  id: "ft_" + Math.random(),
+                  x: chest.x,
+                  y: chest.y - 40,
+                  text: "啟動子彈陀螺!",
+                  color: "#fbbf24", // Gold color, same as 任務達成!
+                  life: 1.9,
+                  maxLife: 1.9,
+                  vy: -30,
+                  style: "armed_acquired"
+                });
+            } else if (randomWeapon === 1) {
+                // Spawn THREE GuardTops
+                const numGuards = 3;
+                const baseAngle = Math.random() * Math.PI * 2;
+                const orbitRadius = 130;
+                
+                for (let i = 0; i < numGuards; i++) {
+                    const angle = baseAngle + (i * Math.PI * 2 / numGuards);
+                    const x = topOther.x + Math.cos(angle) * orbitRadius;
+                    const y = topOther.y + Math.sin(angle) * orbitRadius;
+
+                    engine.bulletTops.push({
+                        id: "bt_g" + i + "_" + Math.random(),
+                        type: 'guard_top',
+                        x: x,
+                        y: y,
+                        vx: 0,
+                        vy: 0,
+                        radius: 40, // 100% of normal top (which is 40)
+                        mass: 1.5,
+                        life: 15, // 15 seconds
+                        maxLife: 15,
+                        angle: 0,
+                        spin: MAX_SPIN,
+                        hitCooldowns: new Map<string, number>(),
+                        speed: 0,
+                        ownerPlayerId: topOther.id,
+                        orbitAngle: angle,
+                        orbitRadius: orbitRadius,
+                        orbitIndex: i
+                    });
+                }
+
+                EffectSystem.addParticles(
+                  engine,
+                  topOther.x,
+                  topOther.y,
+                  "#10b981", // elegant green for guard tops
+                  30,
+                  400,
+                  8,
+                );
+                
+                engine.floatingTexts.push({
+                  id: "ft_" + Math.random(),
+                  x: chest.x,
+                  y: chest.y - 40,
+                  text: "啟動護衛陀螺!",
+                  color: "#fbbf24", // Gold color, same as 任務達成!
+                  life: 1.9,
+                  maxLife: 1.9,
+                  vy: -30,
+                  style: "armed_acquired"
+                });
+            } else {
+                const numTraps = 4;
+                const baseAngle = Math.random() * Math.PI * 2;
+                const trapRadius = 40;
+                for (let i = 1; i <= numTraps; i++) {
+                    const dist = i * trapRadius * 2;
+                    const x = chest.x + Math.cos(baseAngle) * dist;
+                    const y = chest.y + Math.sin(baseAngle) * dist;
+                    engine.bulletTops.push({
+                        id: "bt_t" + i + "_" + Math.random(),
+                        type: "trap_top",
+                        x: x,
+                        y: y,
+                        vx: 0,
+                        vy: 0,
+                        radius: trapRadius,
+                        mass: 5.0,
+                        life: 15,
+                        maxLife: 15,
+                        angle: 0,
+                        spin: 1000,
+                        hitCooldowns: new Map<string, number>(),
+                        speed: 0,
+                        ownerPlayerId: topOther.id,
+                        orbitAngle: baseAngle,
+                        orbitIndex: i,
+                        trapCenterX: chest.x,
+                        trapCenterY: chest.y
+                    });
+                }
+                EffectSystem.addParticles(engine, chest.x, chest.y, "#8b5cf6", 30, 400, 8);
+                engine.floatingTexts.push({
+                  id: "ft_" + Math.random(),
+                  x: chest.x,
+                  y: chest.y - 40,
+                  text: "啟動陷阱陀螺!",
+                  color: "#fbbf24",
+                  life: 1.9,
+                  maxLife: 1.9,
+                  vy: -30,
+                  style: "armed_acquired"
+                });
+            }
             engine.armedAcquiredSlowMoTimer = 1.5;
           } else {
              EffectSystem.addParticles(
@@ -839,7 +940,7 @@ export function hitZombie(
       isActivelyPushing = true;
     }
   }
-  const isCurrentlyDashing = top.state === "dash" || isActivelyPushing;
+  const isCurrentlyDashing = top.state === "dash";
 
   // 如果是僵屍碰觸陀螺造成傷害，碰觸一次傷害1點，攻擊判定觸發的頻率是0.5秒一次，衝撞狀態 (state === 'dash') 則免疫傷
   if (
@@ -847,7 +948,7 @@ export function hitZombie(
       z.type === "zombie_big" ||
       z.type === "zombie_bomb") &&
     !top.isExploding &&
-    !isCurrentlyDashing && top.state !== "standby"
+    !isCurrentlyDashing && !(top.state === "standby" && top.isSpinning)
   ) {
     const isSuper =
       (top.superTimer !== undefined && top.superTimer > 0) ||
@@ -862,18 +963,21 @@ export function hitZombie(
         top.flashTimer = 0.15;
         top.damageShockTimer = 0.25;
 
-        top.spin = Math.max(10, (top.spin ?? 1000) - 300);
-
         if (z.type === "zombie_small") {
+          top.spin = Math.max(10, (top.spin ?? 1000) - 100);
           if (z.fbxModel === "dog") {
             z.attackTimer = 25 / 30; // Attack_S is 25 frames for dog
           } else {
             z.attackTimer = 10 / 30; // Attack_E is 10 frames for man/girl
           }
         } else if (z.type === "zombie_big" && z.fbxModel === "football") {
+          top.spin = Math.max(10, (top.spin ?? 1000) - 300);
           z.attackTimer = 25 / 30; // HeadAttack is 25 frames for football
         } else if (z.type === "zombie_bomb" && z.fbxModel === "bombman") {
+          top.spin = Math.max(10, (top.spin ?? 1000) - 300);
           z.attackTimer = 40 / 30; // Attack is ~40 frames for bombman
+        } else {
+          top.spin = Math.max(10, (top.spin ?? 1000) - 300);
         }
 
         const midX = (top.x + z.x) / 2;
@@ -1404,8 +1508,8 @@ export function hitZombie(
 
   z.hitCooldown = isBoss ? 1.0 : 0.25; // Boss enters 1 second invincibility when injured, others have 250ms
 
-  // 當陀螺碰撞到敵人時，轉速值會增加50點
-  top.spin = Math.min(top.maxSpin ?? MAX_SPIN, (top.spin ?? MAX_SPIN) + 50);
+  // 當陀螺碰撞到敵人時，轉速值會增加100點
+  top.spin = Math.min(top.maxSpin ?? MAX_SPIN, (top.spin ?? MAX_SPIN) + 100);
 
   const isSuperHit =
     (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) ||
