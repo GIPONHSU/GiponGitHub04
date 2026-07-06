@@ -1088,16 +1088,6 @@ export function drawUI(ctx: CanvasRenderingContext2D, engine: GameEngine) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
         ctx.fillRect(innerBarX, hpBarY + 14, currentHpW, 4);
 
-        // Flash Overlay on initial hard impact
-        if (top.damageShockTimer !== undefined && top.damageShockTimer > 0) {
-          const pulseAlpha = Math.min(
-            0.8,
-            (top.damageShockTimer / 0.45) * 0.85,
-          );
-          ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha})`;
-          ctx.fillRect(innerBarX, hpBarY, currentHpW, hpBarH);
-        }
-
         // Spark at Leading Edge
         if (currentHpW < innerBarW) {
           ctx.save();
@@ -1212,6 +1202,16 @@ export function drawUI(ctx: CanvasRenderingContext2D, engine: GameEngine) {
           ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
           ctx.fillRect(segX + 1, spinBarY + spinBarH - 6, segmentW - 2, 5);
         }
+      }
+
+      // 轉速受擊閃爍特效 (Flash Overlay on initial hard impact)
+      if (top.damageShockTimer !== undefined && top.damageShockTimer > 0) {
+        const pulseAlpha = Math.min(
+          0.8,
+          (top.damageShockTimer / 0.45) * 0.85,
+        );
+        ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha})`;
+        ctx.fillRect(innerBarX, spinBarY, innerBarW, spinBarH);
       }
 
       // 轉速全滿時，整條轉速條要有持續閃爍漸變與外圍流光特效

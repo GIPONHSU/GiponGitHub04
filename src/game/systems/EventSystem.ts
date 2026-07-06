@@ -386,15 +386,15 @@ export function triggerZombieSiege(engine: GameEngine, overrideTargetPlayer?: To
     engine.siegeTargetStartX = refX;
     engine.siegeTargetStartY = refY;
     engine.siegeMashCount = 0;
-    engine.siegeMashRequired = 6; // 6 keypresses to break free (reduced by 50% per user request)
+    engine.siegeMashRequired = 9; // 9 keypresses to break free
     engine.siegeTimeRemaining = 0;
     engine.siegeZombies = [];
     engine.siegeAnimateFlingTimer = 0;
     engine.siegeAnimateThrowIndex = 0;
 
-    // Spawn 6 extra small zombies from the outer ring of the warning zone (radius 150px)
-    for (let i = 0; i < 6; i++) {
-        const angle = (i * Math.PI * 2) / 6;
+    // Spawn 10 extra small zombies from the outer ring of the warning zone (radius 150px)
+    for (let i = 0; i < 10; i++) {
+        const angle = (i * Math.PI * 2) / 10;
         const spawnX = refX + Math.cos(angle) * 150;
         const spawnY = refY + Math.sin(angle) * 150;
 
@@ -453,9 +453,9 @@ export function updateZombieSiege(engine: GameEngine, dt: number) {
 
         engine.siegeZombies.forEach((z, idx) => {
             if (z.markForDeletion) return;
-            const angle = (idx * Math.PI * 2 / 6) + timeAngleOffset;
-            const targetX = player.x + Math.cos(angle) * ((player.radius + 10) * 1.7);
-            const targetY = player.y + Math.sin(angle) * ((player.radius + 10) * 1.7);
+            const angle = (idx * Math.PI * 2 / engine.siegeZombies.length) + timeAngleOffset;
+            const targetX = player.x + Math.cos(angle) * ((player.radius + 10) * 1.5);
+            const targetY = player.y + Math.sin(angle) * ((player.radius + 10) * 1.5);
 
             // Dynamically crawl towards the target rather than interpolating from starting snapshot
             // This prevents rigid sliding with the player but ensures real-time tracking!
@@ -479,7 +479,8 @@ export function updateZombieSiege(engine: GameEngine, dt: number) {
 
             // Check distance to check if this zombie caught the player
             const distToPlayer = Math.hypot(z.x - player.x, z.y - player.y);
-            if (distToPlayer <= player.radius + z.radius + 15) {
+            const targetDist = ((player.radius + 10) * 1.5);
+            if (distToPlayer <= targetDist + 5) {
                 firstZombieCaught = true;
             }
 
@@ -492,6 +493,7 @@ export function updateZombieSiege(engine: GameEngine, dt: number) {
         if (firstZombieCaught) {
             engine.siegeStatus = 'clinging';
             SoundSystem.play('SE-Dizzy1');
+            SoundSystem.play('Mech_Gear_019');
             engine.siegeTimeRemaining = 3.0; // 3 seconds count down starts
             engine.siegeMashCount = 0;
 
@@ -519,9 +521,9 @@ export function updateZombieSiege(engine: GameEngine, dt: number) {
         const timeAngleOffset = 0; // engine.timeElapsed * 1.8;
         engine.siegeZombies.forEach((z, idx) => {
             if (z.markForDeletion) return;
-            const angle = (idx * Math.PI * 2 / 6) + timeAngleOffset;
+            const angle = (idx * Math.PI * 2 / engine.siegeZombies.length) + timeAngleOffset;
             const vibration = Math.sin(engine.timeElapsed * 24 + idx) * 3; // 3px vibration
-            const r = ((player.radius + 10) * 1.7) + vibration;
+            const r = ((player.radius + 10) * 1.5) + vibration;
             const targetX = engine.siegeTargetStartX + Math.cos(angle) * r;
             const targetY = engine.siegeTargetStartY + Math.sin(angle) * r;
 
@@ -625,7 +627,7 @@ export function updateZombieSiege(engine: GameEngine, dt: number) {
             // Scatter away remaining siege zombies
             engine.siegeZombies.forEach((z, idx) => {
                 if (z.markForDeletion) return;
-                const scatterAngle = (idx * Math.PI * 2 / 6) + Math.random() * 0.4;
+                const scatterAngle = (idx * Math.PI * 2 / engine.siegeZombies.length) + Math.random() * 0.4;
                 z.vx = Math.cos(scatterAngle) * 600;
                 z.vy = Math.sin(scatterAngle) * 600;
                 z.bounceTimer = 0.5;
@@ -645,7 +647,7 @@ export function updateZombieSiege(engine: GameEngine, dt: number) {
         const timeAngleOffset = engine.timeElapsed * 2.0;
         engine.siegeZombies.forEach((z, idx) => {
             if (z.markForDeletion) return;
-            const angle = (idx * Math.PI * 2 / 6) + timeAngleOffset;
+            const angle = (idx * Math.PI * 2 / engine.siegeZombies.length) + timeAngleOffset;
             z.vx = Math.cos(angle) * flingSpeed;
             z.vy = Math.sin(angle) * flingSpeed;
             z.x += z.vx * dt;
@@ -666,10 +668,11 @@ export function updateZombieSiege(engine: GameEngine, dt: number) {
                 EffectSystem.addParticles(engine, z.x, z.y, '#ffffff', 8, 150, 3);
 
                 // Add to score
-                const pIndex = engine.tops.indexOf(player);
-                if (pIndex >= 0 && pIndex < 4) {
-                    engine.scores[pIndex] = (engine.scores[pIndex] || 0) + 150;
-                }
+                const matchIdx = player.id.match(/\d+/);
+                const playerIdx = matchIdx ? parseInt(matchIdx[0], 10) : 0;
+                engine.scores[playerIdx] = (engine.scores[playerIdx] || 0) + 150;
+                engine.spawnTicket(z.x, z.y, 'zombie_small', playerIdx);
+                engine.spawnTicket(z.x, z.y, 'zombie_small', playerIdx);
             }
         });
 

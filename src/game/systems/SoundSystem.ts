@@ -39,7 +39,9 @@ export class SoundSystem {
             'Attack_Break_012',
             'Sco_01',
             'Sca_02',
-            'Sse_03'
+            'Sse_03',
+            'Mech_Gear_06',
+            'Mech_Gear_019'
         ];
 
         sounds.forEach(name => {

@@ -91,7 +91,7 @@ export function updateBombZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                 engine.tops.forEach(top => {
                     if (top.markForDeletion || top.isExploding || top.hp <= 0 || (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0)) return;
                     const dist = Math.hypot(top.x - big.x, top.y - big.y);
-                    if (dist <= 350) {
+                    if (dist <= 350 + (top.radius || 25)) {
                         if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
                             const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
                             if (!isInvulnerable) {
@@ -281,7 +281,7 @@ export function updateBombZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                 engine.tops.forEach(top => {
                     if (top.markForDeletion || top.isExploding || top.hp <= 0 || (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0)) return;
                     const dist = Math.hypot(top.x - big.x, top.y - big.y);
-                    if (dist <= 350) {
+                    if (dist <= 350 + (top.radius || 25)) {
                         if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
                             const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
                             if (!isInvulnerable) {

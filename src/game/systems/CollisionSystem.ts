@@ -55,6 +55,7 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
     const targetTop = (a.type === "top" ? a : b) as Top;
 
     boss.bossAttackState = "struggle_clash";
+    SoundSystem.play("Mech_Gear_019");
     boss.bossAttackTimer = 3.0; // Exactly 3 seconds intense wrestle event
     targetTop.struggleMashCount = 0;
     targetTop.struggleMashRequired = 8; // 8 mashes required (reduced by 50% for easier victory)
@@ -587,21 +588,16 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
                 10,
               );
             } else {
-              const damage = 5; // Deduct 5 HP (Changed to 5 points damage)
               if (
                 topOther.hitCooldown === undefined ||
                 topOther.hitCooldown <= 0
               ) {
-                topOther.hp = Math.max(0, topOther.hp - damage);
+                // Remove HP deduction, only deduct Spin
+                topOther.spin = Math.max(10, (topOther.spin ?? 1000) - 300); // 扣減3格轉速
                 SoundSystem.play("SE-Hurt1");
                 topOther.hitCooldown = 1.0; // 1 second protection
                 topOther.flashTimer = 0.25;
                 topOther.damageShockTimer = 0.45;
-                topOther.hpLossTimer = 0.5;
-                topOther.visualHp =
-                  topOther.visualHp !== undefined
-                    ? Math.max(topOther.hp, topOther.visualHp)
-                    : topOther.hp;
 
                 // Add some explosive particles on player
                 EffectSystem.addParticles(
@@ -715,11 +711,10 @@ export function handleCollision(engine: GameEngine, a: Entity, b: Entity) {
           if (Math.random() < 0.2 || hits >= 10) {
             chest.markForDeletion = true;
             SoundSystem.play("SE-Heal1");
+            SoundSystem.play("Mech_Gear_06");
             EffectSystem.spawnBoxStarExplosion(engine, chest.x, chest.y);
             
             // Grant "special armed ability" to the top
-            // Placeholder: give a super state buff
-            topOther.superTimer = (topOther.superTimer || 0) + 5; 
             
             let randomWeapon = (engine.lastWeaponDrawn === undefined) ? 0 : (engine.lastWeaponDrawn + 1) % 3;
             engine.lastWeaponDrawn = randomWeapon;
@@ -942,6 +937,8 @@ export function hitZombie(
   }
   const isCurrentlyDashing = top.state === "dash";
 
+  let activeAttackTriggered = false;
+
   // 如果是僵屍碰觸陀螺造成傷害，碰觸一次傷害1點，攻擊判定觸發的頻率是0.5秒一次，衝撞狀態 (state === 'dash') 則免疫傷
   if (
     (z.type === "zombie_small" ||
@@ -956,6 +953,7 @@ export function hitZombie(
       (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
     if (!isSuper) {
       if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
+        activeAttackTriggered = true;
         SoundSystem.play("SE-Hurt1");
         top.hitCooldown = 1.0; // 1-second invulnerability protection
         top.smallZombieHitCooldown = 1.0;
@@ -1518,7 +1516,7 @@ export function hitZombie(
     top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0;
 
   // 每次碰撞"敵人"時，扣減陀螺自己 1 點 HP (代表可發動攻擊的次數)
-  if (!isSuperHit) {
+  if (!isSuperHit && !activeAttackTriggered) {
     top.hp = Math.max(0, top.hp - 1);
     top.visualHp =
       top.visualHp !== undefined ? Math.max(top.hp, top.visualHp) : top.hp;

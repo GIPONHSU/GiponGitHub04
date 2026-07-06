@@ -478,25 +478,31 @@ export function drawEntities(
           });
         }
       } else if (boss.bossSelectedAttack === "earthquake") {
-        // Draw pulsing red warning area centered on the boss with a radius of exactly 350px
+        // Draw pulsing red warning area centered on the boss with concentric circles matching the 3 sequential wave radii (350, 420, 504)
         ctx.save();
         ctx.translate(z.x, z.y);
 
-        // 1. Semi-transparent pulsing red fill with 350px radius
-        ctx.fillStyle = `rgba(239, 68, 68, ${0.16 + pulse * 0.12})`;
-        ctx.beginPath();
-        ctx.arc(0, 0, 350, 0, Math.PI * 2);
-        ctx.fill();
+        const radii = [350, 420, 504];
 
-        // 2. Dashed red outline
-        ctx.strokeStyle = `rgba(239, 68, 68, ${0.65 + pulse * 0.25})`;
-        ctx.lineWidth = 4;
-        ctx.setLineDash([15, 10]);
-        ctx.beginPath();
-        ctx.arc(0, 0, 350, 0, Math.PI * 2);
-        ctx.stroke();
+        // 1. Semi-transparent pulsing red fills for all 3 layers
+        radii.forEach((radius, idx) => {
+          ctx.fillStyle = `rgba(239, 68, 68, ${0.12 - idx * 0.03 + pulse * 0.06})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
 
-        // 3. Central danger crosshair (larger size matching 350px range scale)
+        // 2. Dashed red outlines for all 3 layers
+        radii.forEach((radius, idx) => {
+          ctx.strokeStyle = `rgba(239, 68, 68, ${0.65 - idx * 0.1 + pulse * 0.25})`;
+          ctx.lineWidth = 4 - idx * 0.5;
+          ctx.setLineDash([15, 10]);
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        // 3. Central danger crosshair (larger size matching 504px range scale)
         ctx.strokeStyle = `rgba(239, 68, 68, ${0.7 + pulse * 0.3})`;
         ctx.lineWidth = 3;
         ctx.setLineDash([]);
@@ -619,25 +625,34 @@ export function drawEntities(
           ctx.restore();
         }
       } else {
-        // Default Dash Attack warning channel
-        ctx.save();
-        ctx.translate(z.x, z.y);
-        const angle = Math.atan2(
+        // Default Dash Attack warning channel - Draw 3 warning paths (0, +30, -30 degrees)
+        const angleOriginal = Math.atan2(
           z.bossDashDirectionY ?? 0,
           z.bossDashDirectionX ?? 1,
         );
-        ctx.rotate(angle);
+        
+        const angles = [
+          angleOriginal,
+          angleOriginal + 30 * Math.PI / 180,
+          angleOriginal - 30 * Math.PI / 180
+        ];
 
-        // Pulsing red transparent hazard channel
-        ctx.fillStyle = `rgba(239, 68, 68, ${0.12 + pulse * 0.12})`;
-        ctx.fillRect(0, -128, 2000, 256);
+        angles.forEach(angle => {
+          ctx.save();
+          ctx.translate(z.x, z.y);
+          ctx.rotate(angle);
 
-        // Warn borders
-        ctx.strokeStyle = `rgba(239, 68, 68, ${0.45 + pulse * 0.35})`;
-        ctx.lineWidth = 4;
-        ctx.setLineDash([30, 20]);
-        ctx.strokeRect(0, -128, 2000, 256);
-        ctx.restore();
+          // Pulsing red transparent hazard channel
+          ctx.fillStyle = `rgba(239, 68, 68, ${0.12 + pulse * 0.12})`;
+          ctx.fillRect(0, -128, 2000, 256);
+
+          // Warn borders
+          ctx.strokeStyle = `rgba(239, 68, 68, ${0.45 + pulse * 0.35})`;
+          ctx.lineWidth = 4;
+          ctx.setLineDash([30, 20]);
+          ctx.strokeRect(0, -128, 2000, 256);
+          ctx.restore();
+        });
       }
     }
 
@@ -760,33 +775,36 @@ export function drawEntities(
     // Draw active red laser beams when Boss or Big Zombies are in 'dash' state
     if (z.type === "zombie_boss" && (z as any).bossAttackState === "dash") {
       const boss = z as any;
-      ctx.save();
-      ctx.translate(boss.x, boss.y);
-      const angle = Math.atan2(
+      const baseAngle = Math.atan2(
         boss.bossDashDirectionY ?? 0,
         boss.bossDashDirectionX ?? 1,
       );
-      ctx.rotate(angle);
+      
+      const angles = [
+        baseAngle,
+        baseAngle + 30 * Math.PI / 180,
+        baseAngle - 30 * Math.PI / 180
+      ];
 
-      // Outer glow shadow
-      // Removed shadowColor for perf
-      // Removed shadowBlur for perf
+      angles.forEach(angle => {
+        ctx.save();
+        ctx.translate(boss.x, boss.y);
+        ctx.rotate(angle);
 
-      // Deep red outer beam (matching 256px width)
-      ctx.fillStyle = "rgba(239, 68, 68, 0.4)";
-      ctx.fillRect(0, -128, 2000, 256);
+        // Deep red outer beam (matching 256px width)
+        ctx.fillStyle = "rgba(239, 68, 68, 0.4)";
+        ctx.fillRect(0, -128, 2000, 256);
 
-      // Bright red neon inner beam
-      ctx.fillStyle = "rgba(239, 68, 68, 0.85)";
-      ctx.fillRect(0, -60, 2000, 120);
+        // Bright red neon inner beam
+        ctx.fillStyle = "rgba(239, 68, 68, 0.85)";
+        ctx.fillRect(0, -60, 2000, 120);
 
-      // Intense white-hot core
-      ctx.fillStyle = "#ffffff";
-      // Removed shadowColor for perf
-      // Removed shadowBlur for perf
-      ctx.fillRect(0, -15, 2000, 30);
+        // Intense white-hot core
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, -15, 2000, 30);
 
-      ctx.restore();
+        ctx.restore();
+      });
     }
 
     if (z.type === "zombie_big" && (z as any).bigAttackState === "dash") {

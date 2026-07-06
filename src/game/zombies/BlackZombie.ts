@@ -399,15 +399,15 @@ export function updateBlackZombie(engine: GameEngine, black: Zombie, dt: number,
                     SoundSystem.play('SE-Explo1');
                     black.flashTimer = 0.5;
                     
-                    // Player dashes forward triumphantly
-                    targetTop.vx = nx * 1800;
-                    targetTop.vy = ny * 1800;
-                    targetTop.dashDirectionX = nx;
-                    targetTop.dashDirectionY = ny;
-                    targetTop.state = 'dash';
-                    targetTop.dashTimer = 0.6;
-                    targetTop.maxDashDuration = 0.6;
-                    targetTop.struggleTriumphTimer = 0.6;
+                    // Player top is released into beautiful orbital standby spin alignment (rapid spin-around whip)
+                    targetTop.state = 'standby';
+                    targetTop.spin = 1000;
+                    if (targetTop.smoothSpin !== undefined) targetTop.smoothSpin = 1000;
+                    targetTop.standbyAngle = Math.random() * Math.PI * 2;
+                    targetTop.standbyCenterX = targetTop.x;
+                    targetTop.standbyCenterY = targetTop.y;
+                    targetTop.breakoutOrbitTimer = 1.0;
+                    targetTop.struggleTriumphTimer = 1.0;
                     
                     engine.shockwaves.push({
                         x: targetTop.x,

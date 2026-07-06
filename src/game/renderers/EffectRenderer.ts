@@ -232,7 +232,19 @@ export function drawEffects(ctx: CanvasRenderingContext2D, engine: GameEngine, s
             ctx.lineWidth = sw.thickness * (sw.life / sw.maxLife);
             ctx.globalAlpha = sw.life / sw.maxLife;
 
-            if (sw.isRainbow) {
+            if (sw.isEarthquake) {
+                // Earthquake waves stay opaque longer and have a filled area to match the attack range visually
+                ctx.globalAlpha = Math.pow(sw.life / sw.maxLife, 0.5); 
+                ctx.strokeStyle = sw.color;
+                
+                const fillGrad = ctx.createRadialGradient(sw.x, sw.y, 0, sw.x, sw.y, sw.radius);
+                fillGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                fillGrad.addColorStop(0.5, sw.color.replace(/[\d.]+\)$/, '0.2)'));
+                fillGrad.addColorStop(0.8, sw.color.replace(/[\d.]+\)$/, '0.6)'));
+                fillGrad.addColorStop(1, sw.color);
+                
+                ctx.fillStyle = fillGrad;
+            } else if (sw.isRainbow) {
                 // Draw a solid white backing stroke first to make the rainbow colors extremely vivid
                 ctx.save();
                 ctx.strokeStyle = `rgba(255, 255, 255, ${sw.life / sw.maxLife * 0.95})`;
@@ -247,22 +259,19 @@ export function drawEffects(ctx: CanvasRenderingContext2D, engine: GameEngine, s
                 grad.addColorStop(0.5, `hsla(${(clock + 120) % 360}, 100%, 65%, ${sw.life / sw.maxLife})`);
                 grad.addColorStop(1, `hsla(${(clock + 240) % 360}, 100%, 55%, ${sw.life / sw.maxLife})`);
                 ctx.strokeStyle = grad;
-                // Removed shadowColor for perf
             } else if (sw.isDashedRed) {
                 ctx.strokeStyle = '#ef4444';
                 ctx.setLineDash([16, 12]);
                 ctx.lineDashOffset = -(Date.now() * 0.08) % 28;
-                // Removed shadowColor for perf
             } else {
                 ctx.strokeStyle = sw.color;
-                // Removed shadowColor for perf
             }
-            
-            // Neon glow matching the glowing colors
-            // Removed shadowBlur for perf
             
             ctx.beginPath();
             ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+            if (sw.isEarthquake) {
+                ctx.fill();
+            }
             ctx.stroke();
             ctx.restore();
         });

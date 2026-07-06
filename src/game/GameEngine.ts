@@ -5,11 +5,6 @@ import { GameRenderer } from './GameRenderer';
 import { resolveCollision, checkCollision, resolveCircleBoxCollision, resolveCircleTriangleCollision, checkCircleBoxCollision } from './physics';
 import { createTopSprite, createZombieSprite, createBarrelSprite, createCrateSprite, createZombieBossSprite } from './spriteLoader';
 import { SoundSystem } from './systems/SoundSystem';
-
-
-
-
-
 import * as InputSystem from './systems/InputSystem';
 import * as EffectSystem from './systems/EffectSystem';
 import * as EventSystem from './systems/EventSystem';
@@ -18,14 +13,12 @@ import * as GameUtils from './systems/GameUtils';
 import * as SpawnSystem from './systems/SpawnSystem';
 import { CANVAS_W, CANVAS_H, MAX_SPIN, TOP_RADIUS } from './constants';
 const MAX_HP = 150;
-
 const PLAYER_PROFILES = [
     { color: '#3b82f6', pilot: '#93c5fd', label: 'P1', controls: { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', spin: 'KeyQ', skill: 'KeyE' } },
     { color: '#ef4444', pilot: '#fca5a5', label: 'P2', controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', spin: 'Enter', skill: 'ControlRight' } },
     { color: '#eab308', pilot: '#fdf08a', label: 'P3', controls: { up: 'KeyK', down: 'KeyI', left: 'KeyL', right: 'KeyJ', spin: 'KeyU', skill: 'KeyO' } },
     { color: '#22c55e', pilot: '#86efac', label: 'P4', controls: { up: 'Numpad5', down: 'Numpad8', left: 'Numpad6', right: 'Numpad4', spin: 'Digit7', skill: 'Numpad9' } }
 ];
-
 export function checkRayCircleCollision(
     originX: number, originY: number,
     dirX: number, dirY: number,
@@ -48,10 +41,8 @@ export function checkRayCircleCollision(
     const dist = Math.hypot(dx, dy);
     return dist < (circleRadius + laserHalfWidth);
 }
-
 export class GameEngine {
     renderer: GameRenderer;
-            
     tops: Top[] = [];
     zombies: Zombie[] = [];
     obstacles: Obstacle[] = [];
@@ -63,19 +54,15 @@ export class GameEngine {
     projectiles: Projectile[] = [];
     phantomClones: PhantomClone[] = [];
     bulletTops: BulletTop[] = [];
-    shockwaves: { x: number; y: number; radius: number; maxRadius: number; speed: number; color: string; thickness: number; life: number; maxLife: number; isRainbow?: boolean; isDashedRed?: boolean }[] = [];
+    shockwaves: { x: number; y: number; radius: number; maxRadius: number; speed: number; color: string; thickness: number; life: number; maxLife: number; isRainbow?: boolean; isDashedRed?: boolean; isEarthquake?: boolean }[] = [];
     slashLines: { x1: number; y1: number; x2: number; y2: number; life: number; maxLife: number; color: string; width: number }[] = [];
     xSlashes: { x: number; y: number; size: number; maxSize: number; speed: number; angle: number; life: number; maxLife: number; color: string; thickness: number }[] = [];
-    
     lastWeaponDrawn?: number; // 0 for bullet, 1 for guard, 2 for trap
-    
     camera = {
         x: 960,
         y: 540,
         zoom: 1.0
     };
-    
-        
     keys = new Set<string>();
     lastTime = 0;
     rafId = 0;
@@ -91,10 +78,9 @@ export class GameEngine {
     bossDefeated = false;
     bossDefeatTimer = 1.8;
     participants: PlayerStats[] = [];
-    
     spawnTimer = 0;
-    goldenZombieTimer = 0;
-    blackZombieTimer = 0;
+    specialEnemyTimer = 0;
+    lastSpecialEnemyType: string | null = null;
     obstacleTimer = 0;
     chestSpawnTimer = 0;
     starSpawnTimer = 0;
@@ -102,7 +88,6 @@ export class GameEngine {
     launchPadSpawnTimer = 0;
     lastSpawnedLaunchPadId = '';
     multiplayerLaunchPadTimer = 0;
-    
     isGameOver = false;
     pausedDrawTime = 0;
     private _isPaused = false;
@@ -125,16 +110,14 @@ export class GameEngine {
     modelTypes: number[] = [1, 2, 3, 4];
     gameMode: 'campaign' | 'versus' = 'campaign';
     energyPerCoin: number = 15;
-
     introActive = true;
     introStage: 'ready_spin' | 'center_dash' | 'falling' | 'message' | 'none' | 'boss_falling' | 'boss_message' = 'ready_spin';
     introTimer = 1.6;
     messageTimer = 1.4;
-
     levelUpSlowMoTimer = 0;
     levelUpTargetTopId: string | null = null;
     armedAcquiredSlowMoTimer = 0;
-
+    struggleSlowMoTimer = 0;
     areaCycle = 0;
     areaTransitionState: 'none' | 'exploding' | 'fade_in' = 'none';
     transitionBgChanged = false;
@@ -142,22 +125,20 @@ export class GameEngine {
     transitionState: 'none' | 'buffer' = 'none';
     oneMinuteTransitionState: 'none' | 'exploding' | 'waiting_to_move' | 'moving_down' = 'none';
     collectiveKeys = 0;
+    bossTransitionPending = false;
     areaTransitionTimer = 0;
     areaTransitionOverlayAlpha = 0;
     explosionSpawnTimer = 0;
     activeArenaCenterY = 540;
-
     versusEndActive = false;
     versusEndTimer = 1.6;
-
     // Zombie Siege Event Properties
     zombieSiegeActive = false;
-    zombieSiegeTimer = 30.0 + Math.random() * 10.0;
     siegeTargetPlayerId: string | null = null;
     siegeZombies: any[] = [];
     siegeTimeRemaining = 0;
     siegeMashCount = 0;
-    siegeMashRequired = 6;
+    siegeMashRequired = 9;
     siegeStatus: 'approaching' | 'clinging' | 'resolved_success' | 'resolved_fail' | null = null;
     siegeRadius = 350;
     siegeProgress = 0.0;
@@ -173,7 +154,6 @@ export class GameEngine {
         isForced?: boolean;
         targetPlayerId?: string;
     } | null = null;
-
     constructor(canvas: HTMLCanvasElement, joinedFlags: boolean[], onGameOver: (winner: string, stats?: PlayerStats[]) => void, modelTypes: number[] = [1, 2, 3, 4], gameMode: 'campaign' | 'versus' = 'campaign', onMusicChange?: (music: 'area1' | 'area2' | 'boss') => void, energyPerCoin: number = 15) {
         this.modelTypes = modelTypes;
         this.gameMode = gameMode;
@@ -181,14 +161,11 @@ export class GameEngine {
         this.renderer = new GameRenderer(canvas, this.modelTypes);
         this.onGameOver = onGameOver;
         this.onMusicChange = onMusicChange;
-
         SoundSystem.init();
-        
         ((this as any).handleKeyDownBound) = (e) => InputSystem.handleKeyDown(this, e);
         ((this as any).handleKeyUpBound) = (e) => InputSystem.handleKeyUp(this, e);
         window.addEventListener('keydown', (this as any).handleKeyDownBound as any);
         window.addEventListener('keyup', (this as any).handleKeyUpBound as any);
-        
         // Define getter/setter to block early boss defeated state triggers
         let realBossDefeated = false;
         Object.defineProperty(this, 'bossDefeated', {
@@ -203,17 +180,14 @@ export class GameEngine {
             configurable: true,
             enumerable: true
         });
-
         this.initGame(joinedFlags);
     }
-    
     destroy() {
         window.removeEventListener('keydown', (this as any).handleKeyDownBound as any);
         window.removeEventListener('keyup', (this as any).handleKeyUpBound as any);
         cancelAnimationFrame(this.rafId);
         SoundSystem.stopAll();
     }
-
     initGame(joinedFlags: boolean[]) {
         if (this.onMusicChange) {
             this.onMusicChange('area1');
@@ -246,22 +220,21 @@ export class GameEngine {
         this.activeLaunchPads = [];
         this.launchPadSpawnTimer = 0;
         this.multiplayerLaunchPadTimer = 0;
-
         this.areaCycle = 0;
         this.areaTransitionState = 'none';
         this.areaTransitionTimer = 0;
         this.areaTransitionOverlayAlpha = 0;
         this.explosionSpawnTimer = 0;
         this.activeArenaCenterY = 540;
-
         // Reset Zombie Siege Event Properties on startup/reset
         this.zombieSiegeActive = false;
-        this.zombieSiegeTimer = 30.0 + Math.random() * 10.0;
+        this.specialEnemyTimer = 0;
+        this.lastSpecialEnemyType = null;
         this.siegeTargetPlayerId = null;
         this.siegeZombies = [];
         this.siegeTimeRemaining = 0;
         this.siegeMashCount = 0;
-        this.siegeMashRequired = 6;
+        this.siegeMashRequired = 9;
         this.siegeStatus = null;
         this.siegeRadius = 350;
         this.siegeProgress = 0.0;
@@ -276,8 +249,6 @@ export class GameEngine {
             zoom: 1.0
         };
         this.timeRemaining = this.gameMode === 'versus' ? 90 : 180;
-
-        
         // Spawn Tops
         const startPos = [
             { x: 360, y: CANVAS_H - 360 }, // P1: bottom-left
@@ -285,29 +256,24 @@ export class GameEngine {
             { x: 360, y: 360 }, // P3: top-left
             { x: CANVAS_W - 360, y: 360 } // P4: top-right
         ];
-
         const padding = 24;
         const barW = 210;
         const cornerXLeft = padding + barW / 2;
         const cornerXRight = CANVAS_W - padding - barW / 2;
         const cornerYTop = padding + 175;
         const cornerYBottom = CANVAS_H - 130 - 65;
-
         const cornerPos = [
             { x: cornerXLeft, y: cornerYBottom }, // P1
             { x: cornerXRight, y: cornerYBottom }, // P2
             { x: cornerXLeft, y: cornerYTop }, // P3
             { x: cornerXRight, y: cornerYTop } // P4
         ];
-
         // 1. Generate 3 rectangular concrete blocks (50% smaller size)
         this.generateConcreteBlocksForCenter(540);
-
         this.introActive = false;
         this.introStage = 'none';
         this.introTimer = 0;
         this.messageTimer = 0;
-
         let finalFlags = [...joinedFlags];
         const joinedCount = finalFlags.filter(f => f).length;
         if (this.gameMode === 'versus' && joinedCount < 2) {
@@ -320,11 +286,9 @@ export class GameEngine {
         }
         // Do not force player 1 to be active in campaign mode.
         this.activeSlots = finalFlags;
-
         for (let i = 0; i < 4; i++) {
             if (!this.activeSlots[i]) continue;
             const isAI = !joinedFlags[i];
-            
             this.participants.push({
                 id: `top_${i}`,
                 label: PLAYER_PROFILES[i].label,
@@ -335,7 +299,6 @@ export class GameEngine {
                 isActive: true,
                 modelType: this.modelTypes[i] || 1
             });
-
             this.tops.push({
                 id: `top_${i}`,
                 type: 'top',
@@ -374,13 +337,13 @@ export class GameEngine {
                 spinTutorialSpun: false,
                 modelType: this.modelTypes[i] || 1
             });
-            GameUtils.initializeTopMissions(this.tops[this.tops.length - 1]);
+            const newlyPushedTop = this.tops[this.tops.length - 1];
+            this.setupTopHpProtection(newlyPushedTop);
+            GameUtils.initializeTopMissions(newlyPushedTop);
         }
-        
         this.lastTime = performance.now();
         this.rafId = requestAnimationFrame((t) => this.loop(t));
     }
-
     generateConcreteBlocksForCenter(centerY: number) {
         const startPosOffset = centerY - 540;
         const startPos = [
@@ -389,7 +352,6 @@ export class GameEngine {
             { x: 360, y: 360 + startPosOffset },
             { x: CANVAS_W - 360, y: 360 + startPosOffset }
         ];
-
         for (let i = 0; i < 3; i++) {
             const w = (150 + Math.random() * 80) * 0.5;
             const h = (150 + Math.random() * 80) * 0.5;
@@ -399,7 +361,6 @@ export class GameEngine {
             while (attempts < 100) {
                 bx = 400 + Math.random() * (CANVAS_W - 800);
                 by = startPosOffset + 250 + Math.random() * (CANVAS_H - 500);
-
                 // Ensure far from spawn corners
                 let farFromSpawns = true;
                 for (const pos of startPos) {
@@ -408,7 +369,6 @@ export class GameEngine {
                         break;
                     }
                 }
-
                 // Ensure not overlapping previous blocks
                 let farFromOthers = true;
                 for (const other of this.concreteBlocks) {
@@ -419,7 +379,6 @@ export class GameEngine {
                         break;
                     }
                 }
-
                 // Ensure all 4 corners are inside the horizontal capsule with a safe margin
                 let insideCapsule = true;
                 const corners = [
@@ -434,7 +393,6 @@ export class GameEngine {
                         break;
                     }
                 }
-
                 // Ensure far from launch pads as well
                 let farFromLaunchPads = true;
                 const padsToCheck = [
@@ -448,13 +406,11 @@ export class GameEngine {
                         break;
                     }
                 }
-
                 if (farFromSpawns && farFromOthers && insideCapsule && farFromLaunchPads) {
                     break;
                 }
                 attempts++;
             }
-
             this.concreteBlocks.push({
                 id: `concrete_${i}_${Date.now()}_${Math.random()}`,
                 type: 'concrete_block',
@@ -467,11 +423,9 @@ export class GameEngine {
             });
         }
     }
-
     insertCoin(coinSlotIdx: number) {
         let p = this.participants.find(p => p.id === `top_${coinSlotIdx}`);
         let top = this.tops.find(t => t.id === `top_${coinSlotIdx}`);
-
         if (!p || (!p.isActive && !top)) {
             if (!p) {
                 p = {
@@ -502,7 +456,6 @@ export class GameEngine {
             (p as any).pendingCoins = ((p as any).pendingCoins || 0) + 1;
             return;
         }
-
         if (top && (top.hp <= 0 || (top as any).isDeadState) && p) {
             const timeSinceDeath = Date.now() - ((top as any).deathTimestamp || 0);
             if (timeSinceDeath > 20000) {
@@ -515,15 +468,12 @@ export class GameEngine {
                 // Instantly revive, fall through to spawn logic
             }
         }
-
         (p as any).pendingCoins = 1;
         this.spawnTopForParticipant(coinSlotIdx);
     }
-
     spawnTopForParticipant(coinSlotIdx: number) {
         let top = this.tops.find(t => t.id === `top_${coinSlotIdx}`);
         let newlyJoined = false;
-        
         if (!top) {
             newlyJoined = true;
             // Add player
@@ -531,7 +481,6 @@ export class GameEngine {
             const cornerXRight = CANVAS_W - 190;
             const cornerYTop = 130 + 65;
             const cornerYBottom = CANVAS_H - 130 - 65;
-
             const cornerPos = [
                 { x: cornerXLeft, y: cornerYBottom }, // P1
                 { x: cornerXRight, y: cornerYBottom }, // P2
@@ -544,7 +493,6 @@ export class GameEngine {
                 { x: 500, y: 420 }, // P3
                 { x: CANVAS_W - 500, y: 420 } // P4
             ];
-            
             top = {
                 id: `top_${coinSlotIdx}`,
                 type: 'top',
@@ -587,13 +535,12 @@ export class GameEngine {
                 modelType: this.modelTypes[coinSlotIdx] || 1
             };
             GameUtils.initializeTopMissions(top);
+            this.setupTopHpProtection(top);
             (top as any).launchPadSource = 'corner_direct';
             (top as any).launchPadStartX = cornerPos[coinSlotIdx].x;
             (top as any).launchPadStartY = cornerPos[coinSlotIdx].y;
             this.tops.push(top);
-            
             EffectSystem.addParticles(this, cornerPos[coinSlotIdx].x, cornerPos[coinSlotIdx].y, PLAYER_PROFILES[coinSlotIdx].color, 40, 300, 10);
-
             const p = this.participants.find(p => p.id === `top_${coinSlotIdx}`);
             if (p) {
                 p.isActive = true;
@@ -623,26 +570,20 @@ export class GameEngine {
                 top.modelType = p.modelType;
             }
         }
-
         let p = this.participants.find(p => p.id === `top_${coinSlotIdx}`);
         let coinsToAdd = p && (p as any).pendingCoins ? (p as any).pendingCoins : 1;
         if (p) {
             (p as any).pendingCoins = 0; // reset
         }
-
         if (top) {
             top.coins = (top.coins ?? 0) + coinsToAdd;
-            
             const wasDead = top.hp <= 0 || top.isExploding || newlyJoined || (top as any).isDeadState;
-            
             // 陀螺獲得相對應的能量數
             top.hp = Math.max(0, top.hp) + (this.energyPerCoin * coinsToAdd);
-
             // 如果能量數超出了當下HP上限，則HP上限也要跟著往上調整
             if (top.maxHp === undefined || top.hp > top.maxHp) {
                 top.maxHp = top.hp;
             }
-
             if (wasDead) {
                 // Was dead, now revived / joined
                 top.visualHp = 0; // Clear ghost HP from before death
@@ -668,17 +609,14 @@ export class GameEngine {
                     top.vx = 0;
                     top.vy = 0;
                     top.rainbowSuperTimer = 1.5; // Brief invulnerability window
-                    
                     // Prevent any automatic movement (or inheriting dead movement state) upon revival until player provides input
                     (top as any).isRevivedIdle = true;
-                    
                     // Re-calculate standby center at current position to restore standby in place without standby dash
                     top.standbyCenterVx = 0;
                     top.standbyCenterVy = 0;
                     top.standbyAngle = Math.random() * Math.PI * 2;
                     top.standbyCenterX = top.x - Math.cos(top.standbyAngle) * getStandbyRadiusForModel(top, this, top.standbyAngle);
                     top.standbyCenterY = top.y - Math.sin(top.standbyAngle) * getStandbyRadiusForModel(top, this, top.standbyAngle);
-                    
                     // Golden expanding shockwave on revive
                     this.shockwaves.push({
                         x: top.x,
@@ -691,7 +629,6 @@ export class GameEngine {
                         life: 0.6,
                         maxLife: 0.6
                     });
-                    
                     // Play heal sound effect on revive
                     SoundSystem.play('SE-Heal1');
                 }
@@ -699,7 +636,6 @@ export class GameEngine {
             top.visualHp = top.visualHp !== undefined ? Math.max(top.hp, top.visualHp) : top.hp;
         }
     }
-
     spawnDroppedKey(x: number, y: number) {
         this.items.push({
             id: `key_dropped_${Date.now()}_${Math.random()}`,
@@ -717,7 +653,6 @@ export class GameEngine {
             hoverTimer: 2.0 // stays for 2 seconds
         });
     }
-
     spawnTicket(x: number, y: number, zombieType: string, playerIdx: number) {
         let totalAmount = 0;
         if (zombieType === 'zombie_small') totalAmount = 2;
@@ -726,11 +661,9 @@ export class GameEngine {
         else if (zombieType === 'zombie_bouncing') totalAmount = 10;
         else if (zombieType === 'zombie_golden' || zombieType === 'zombie_black') totalAmount = 15;
         else if (zombieType === 'zombie_boss') totalAmount = 100;
-
         if (totalAmount > 0) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 100 + Math.random() * 250;
-
             this.items.push({
                 id: `ticket_${Date.now()}_${Math.random()}`,
                 type: 'item_ticket',
@@ -748,22 +681,49 @@ export class GameEngine {
                 hoverTimer: 0.5 + Math.random() * 0.2
             });
         }
-
-        // Every time an enemy is killed, there is a 1/2000 chance to drop a key
-        const chance = 1 / 2000;
+        // Every time an enemy is killed, there is a 1/1000 chance to drop a key
+        const chance = 1 / 1000;
         if (Math.random() < chance) {
             this.spawnDroppedKey(x, y);
         }
     }
-
+    setupTopHpProtection(top: Top) {
+        let actualHp = top.hp;
+        Object.defineProperty(top, 'hp', {
+            get() {
+                return actualHp;
+            },
+            set(val: number) {
+                let newVal = val;
+                const isCoopStruggle = top.coopState !== undefined;
+                const isBossStruggle = this.zombies ? this.zombies.some(z => 
+                    (z.type === 'zombie_boss' || z.type === 'zombie_black') && 
+                    (z as any).bossAttackState === 'struggle_clash' && 
+                    (z as any).bossWarningTargetId === top.id
+                ) : false;
+                if (isCoopStruggle || isBossStruggle) {
+                    if (newVal <= 0) {
+                        newVal = 1;
+                    }
+                }
+                actualHp = newVal;
+            },
+            configurable: true,
+            enumerable: true
+        });
+    }
     triggerBossTransition() {
+        if (GameUtils.isClashActive(this)) {
+            this.bossTransitionPending = true;
+            return;
+        }
         if (this.areaTransitionState !== 'none') return; // Already transitioning
         this.areaTransitionState = 'exploding';
+        this.bossTransitionPending = false;
         this.areaTransitionTimer = 4.0; // 4 seconds of explosion and fade out
         this.explosionSpawnTimer = 0;
         this.activeLaunchPads = []; // clear launch pads
         this.launchPadSpawnTimer = 0;
-        
         // Immediately destroy all zombies without dropping items
         this.zombies.forEach(z => {
             EffectSystem.addParticles(this, z.x, z.y, '#ff5511', 15, 200, 6);
@@ -772,7 +732,6 @@ export class GameEngine {
         this.zombieSpawningSuspended = true;
         this.items = []; // Clear keys and items too
         this.obstacles = []; // Clear obstacles
-        
         // Immediately switch players and AIs to standby state, stop sliding and drifting!
         this.tops.forEach(top => {
             top.vx = 0;
@@ -782,7 +741,6 @@ export class GameEngine {
             top.state = 'standby';
         });
     }
-
     addScore(topIdx: number, val: number) {
         if (topIdx >= 0 && topIdx < 4) {
             this.scores[topIdx] += val;
@@ -796,7 +754,6 @@ export class GameEngine {
             }
         }
     }
-
     forceActivateInactiveSlots() {
         const startPos = [
             { x: 300, y: CANVAS_H - 300 }, // P1
@@ -804,11 +761,9 @@ export class GameEngine {
             { x: 300, y: 300 }, // P3
             { x: CANVAS_W - 300, y: 300 } // P4
         ];
-        
         for (let i = 0; i < 4; i++) {
             if (!this.activeSlots[i]) {
                 this.activeSlots[i] = true;
-                
                 this.participants.push({
                     id: `top_${i}`,
                     label: PLAYER_PROFILES[i].label,
@@ -819,7 +774,6 @@ export class GameEngine {
                     isActive: true,
                     modelType: this.modelTypes[i] || 1
                 });
-
                  this.tops.push({
                     id: `top_${i}`,
                     type: 'top',
@@ -854,7 +808,7 @@ export class GameEngine {
                     dashDirectionY: 0,
                     modelType: this.modelTypes[i] || 1
                 });
-
+                this.setupTopHpProtection(this.tops[this.tops.length - 1]);
                 EffectSystem.addParticles(this, startPos[i].x, startPos[i].y, PLAYER_PROFILES[i].color, 40, 300, 10);
                 this.shockwaves.push({
                     x: startPos[i].x,
@@ -870,15 +824,11 @@ export class GameEngine {
             }
         }
     }
-    
     // activateHumanPlayerMidGame logic removed.
-    
-
     loop(time: number) {
         let realDt = (time - this.lastTime) / 1000;
         this.lastTime = time;
         if (realDt > 0.1) realDt = 0.1; // clamp lag
-        
         if (!this.isGameOver && !this.isPaused) {
             if (this.levelUpSlowMoTimer > 0) {
                 this.levelUpSlowMoTimer = Math.max(0, this.levelUpSlowMoTimer - realDt);
@@ -888,17 +838,19 @@ export class GameEngine {
                 this.armedAcquiredSlowMoTimer = Math.max(0, this.armedAcquiredSlowMoTimer - realDt);
                 let dt = realDt * 0.05; // 5% speed (noticeable slow motion!)
                 this.update(dt, realDt);
+            } else if (this.struggleSlowMoTimer > 0) {
+                this.struggleSlowMoTimer = Math.max(0, this.struggleSlowMoTimer - realDt);
+                let dt = realDt * 0.1; // 10% speed
+                this.update(dt, realDt);
             } else {
                 this.update(realDt, realDt);
             }
         }
         this.renderer.render(this);
-        
         if (!this.isGameOver) {
             this.rafId = requestAnimationFrame((t) => this.loop(t));
         }
     }
-    
     private updateBulletTops(dt: number, realDt: number = dt) {
         this.bulletTops.forEach(bt => {
             bt.life -= dt;
@@ -932,32 +884,25 @@ export class GameEngine {
                 SoundSystem.play("SE-Explo1");
                 return;
             }
-
             if (bt.isSpiraling) {
                 bt.spiralTimer = (bt.spiralTimer || 0) + realDt;
                 const T = 0.8; // spiral duration
                 const progress = Math.min(1, bt.spiralTimer / T);
-                
                 const startAngle = bt.spiralStartAngle || 0;
                 const dir = bt.spiralDir || 1;
                 // Angle rotates by Math.PI * 3 (1.5 turns)
                 const currentAngle = startAngle + dir * progress * Math.PI * 3;
                 // Radius grows from 0 to 250px for a perfect Taiji spiral
                 const currentRadius = progress * 250;
-                
                 const cx = bt.spiralCenterX ?? bt.x;
                 const cy = bt.spiralCenterY ?? bt.y;
-                
                 const nextX = cx + Math.cos(currentAngle) * currentRadius;
                 const nextY = cy + Math.sin(currentAngle) * currentRadius;
-                
                 // Track velocity during spiral for trails and smooth transition
                 bt.vx = realDt > 0 ? (nextX - bt.x) / realDt : 0;
                 bt.vy = realDt > 0 ? (nextY - bt.y) / realDt : 0;
-                
                 bt.x = nextX;
                 bt.y = nextY;
-                
                 // Keep trail updated for trail rendering during spiral
                 if (!bt.trail) {
                     bt.trail = [];
@@ -966,11 +911,9 @@ export class GameEngine {
                 if (bt.trail.length > 20) {
                     bt.trail.shift();
                 }
-
                 // Spin visual rotation
                 const visualSpinFactor = bt.spin / MAX_SPIN;
                 bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * realDt * 0.7;
-                
                 // If spiral is finished:
                 if (progress >= 1) {
                     bt.isSpiraling = false;
@@ -979,13 +922,11 @@ export class GameEngine {
                     bt.vx = Math.cos(currentAngle) * targetSpeed;
                     bt.vy = Math.sin(currentAngle) * targetSpeed;
                 }
-                
                 // Skip further movement & bounce updates during spiral
                 bt.lastX = bt.x;
                 bt.lastY = bt.y;
                 return;
             }
-
             if (bt.type === 'trap_top') {
                 const orbitSpeed = 4.0; 
                 bt.orbitAngle = (bt.orbitAngle ?? 0) + orbitSpeed * dt;
@@ -995,14 +936,11 @@ export class GameEngine {
                 bt.vy = realDt > 0 ? (nextY - bt.y) / realDt : 0;
                 bt.x = nextX;
                 bt.y = nextY;
-                
                 const visualSpinFactor = bt.spin / 1000;
                 bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
-                
                 if (!bt.trail) bt.trail = [];
                 bt.trail.push({ x: bt.x, y: bt.y });
                 if (bt.trail.length > 20) bt.trail.shift();
-                
                 bt.distanceMoved = bt.distanceMoved || 0;
                 bt.lastSparkDist = bt.lastSparkDist || 0;
                 bt.distanceMoved += Math.hypot(bt.vx * dt, bt.vy * dt);
@@ -1015,26 +953,20 @@ export class GameEngine {
                 if (owner && !owner.markForDeletion && owner.hp > 0) {
                     const orbitSpeed = 6.0; // speed of orbit in rad/s
                     const orbitRadius = 130;
-                    
                     bt.orbitAngle = (bt.orbitAngle ?? 0) + orbitSpeed * dt;
-                    
                     const nextX = owner.x + Math.cos(bt.orbitAngle) * orbitRadius;
                     const nextY = owner.y + Math.sin(bt.orbitAngle) * orbitRadius;
-                    
                     bt.vx = realDt > 0 ? (nextX - bt.x) / realDt : 0;
                     bt.vy = realDt > 0 ? (nextY - bt.y) / realDt : 0;
-                    
                     bt.x = nextX;
                     bt.y = nextY;
                 } else {
                     bt.markForDeletion = true;
                     return;
                 }
-
                 // Update visual rotation angle
                 const visualSpinFactor = bt.spin / MAX_SPIN;
                 bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
-
                 // Update trail
                 if (!bt.trail) {
                     bt.trail = [];
@@ -1043,17 +975,14 @@ export class GameEngine {
                 if (bt.trail.length > 20) {
                     bt.trail.shift();
                 }
-
                 bt.distanceMoved = bt.distanceMoved || 0;
                 bt.lastSparkDist = bt.lastSparkDist || 0;
                 const distThisFrame = Math.hypot(bt.vx * dt, bt.vy * dt);
                 bt.distanceMoved += distThisFrame;
-
                 if (bt.distanceMoved - bt.lastSparkDist >= 100) {
                     bt.lastSparkDist = bt.distanceMoved;
                     EffectSystem.addParticles(this, bt.x, bt.y, "#ffff00", 1, 100, 3, true);
                 }
-
                 bt.lastX = bt.x;
                 bt.lastY = bt.y;
             } else {
@@ -1064,17 +993,14 @@ export class GameEngine {
                         bt.stuckTimer = (bt.stuckTimer || 0) + dt;
                         if (bt.stuckTimer > 0.1) {
                             bt.stuckTimer = 0;
-                            
                             // Force move to another random boundary direction
                             const centerY = this.activeArenaCenterY ?? 540;
                             const leftCenterX = 540;
                             const rightCenterX = 1380;
                             const R = 480;
-
                             const randWall = Math.floor(Math.random() * 4);
                             let targetX = 960;
                             let targetY = 540;
-
                             if (randWall === 0) {
                                 targetX = leftCenterX + Math.random() * (rightCenterX - leftCenterX);
                                 targetY = centerY - R;
@@ -1090,7 +1016,6 @@ export class GameEngine {
                                 targetX = rightCenterX + Math.cos(angle) * R;
                                 targetY = centerY + Math.sin(angle) * R;
                             }
-
                             const dx = targetX - bt.x;
                             const dy = targetY - bt.y;
                             const dist = Math.hypot(dx, dy);
@@ -1108,7 +1033,6 @@ export class GameEngine {
                 }
                 bt.lastX = bt.x;
                 bt.lastY = bt.y;
-
                 // Update trail coordinates for trail renderers
                 if (!bt.trail) {
                     bt.trail = [];
@@ -1117,25 +1041,19 @@ export class GameEngine {
                 if (bt.trail.length > 20) {
                     bt.trail.shift();
                 }
-
                 bt.distanceMoved = bt.distanceMoved || 0;
                 bt.lastSparkDist = bt.lastSparkDist || 0;
-                
                 const visualSpinFactor = bt.spin / MAX_SPIN;
                 bt.angle = (bt.angle || 0) + visualSpinFactor * Math.PI * 18 * dt * 0.7;
-
                 const distThisFrame = Math.hypot(bt.vx * dt, bt.vy * dt);
                 bt.distanceMoved += distThisFrame;
-
                 if (bt.distanceMoved - bt.lastSparkDist >= 100) {
                     bt.lastSparkDist = bt.distanceMoved;
                     EffectSystem.addParticles(this, bt.x, bt.y, "#ffff00", 1, 100, 3, true);
                 }
-
                 bt.x += bt.vx * dt;
                 bt.y += bt.vy * dt;
             }
-
             if (bt.type !== 'guard_top' && bt.type !== 'trap_top') {
                 // Bounce on concrete blocks
                 this.concreteBlocks.forEach(block => {
@@ -1153,57 +1071,47 @@ export class GameEngine {
                         }
                     }
                 });
-
                 // Bounce on other player tops (elastic collision rebound)
                 // BulletTops do not have HP and only self-destruct when their 15-second timer expires.
                 // Other tops will not suffer HP or spin reduction when colliding with BulletTops.
                 this.tops.forEach(top => {
                     if (top.markForDeletion || top.hp <= 0) return;
-
                     const dx = top.x - bt.x;
                     const dy = top.y - bt.y;
                     const dist = Math.hypot(dx, dy);
                     const minDist = bt.radius + top.radius;
-
                     if (dist < minDist && dist > 0) {
                         const nx = dx / dist;
                         const ny = dy / dist;
-
                         // Push apart to prevent overlap
                         const overlap = minDist - dist;
                         bt.x -= nx * overlap * 0.5;
                         bt.y -= ny * overlap * 0.5;
                         top.x += nx * overlap * 0.5;
                         top.y += ny * overlap * 0.5;
-
                         // Rebound velocities
                         const rvx = top.vx - bt.vx;
                         const rvy = top.vy - bt.vy;
                         const velAlongNormal = rvx * nx + rvy * ny;
-
                         if (velAlongNormal < 0) {
                             const bounciness = 0.95;
                             const impulseScalar = -(1 + bounciness) * velAlongNormal;
                             const impulseX = impulseScalar * nx;
                             const impulseY = impulseScalar * ny;
-
                             bt.vx -= impulseX * 0.5;
                             bt.vy -= impulseY * 0.5;
                             top.vx += impulseX * 0.5;
                             top.vy += impulseY * 0.5;
-
                             // Sound & spark effects
                             SoundSystem.play("Attack_Punch_024");
                             const midX = (bt.x + top.x) / 2;
                             const midY = (bt.y + top.y) / 2;
                             EffectSystem.addParticles(this, midX, midY, top.color, 8, 160, 4);
                             EffectSystem.addParticles(this, midX, midY, '#ffffff', 4, 200, 3);
-
                             this.redirectBulletTopToNearestElite(bt);
                         }
                     }
                 });
-
                 // Bounce on wall
                 const oldVx = bt.vx;
                 const oldVy = bt.vy;
@@ -1212,11 +1120,9 @@ export class GameEngine {
                     this.redirectBulletTopToNearestElite(bt);
                 }
             }
-
             if (bt.type === 'trap_top' && bt.orbitIndex !== 1) {
                 return;
             }
-
             let isTrapTopLine = false;
             let startX = 0, startY = 0, endX = 0, endY = 0;
             if (bt.type === 'trap_top') {
@@ -1227,21 +1133,16 @@ export class GameEngine {
                 endX = (bt.trapCenterX || bt.x) + Math.cos(angle) * 320;
                 endY = (bt.trapCenterY || bt.y) + Math.sin(angle) * 320;
             }
-
             // Removed collision with player tops for trap_top
-
             // Collide with zombies (push and damage)
             this.zombies.forEach(z => {
                 if (z.markForDeletion || z.hp <= 0 || (z as any).isSiegeZombie) return;
-                
                 let dx = z.x - bt.x;
                 let dy = z.y - bt.y;
                 let dist = Math.hypot(dx, dy);
                 let minDist = bt.radius + z.radius;
-                
                 let cx = bt.x;
                 let cy = bt.y;
-
                 if (isTrapTopLine) {
                     const l2 = (endX - startX) ** 2 + (endY - startY) ** 2;
                     let t = ((z.x - startX) * (endX - startX) + (z.y - startY) * (endY - startY)) / l2;
@@ -1252,40 +1153,30 @@ export class GameEngine {
                     dy = z.y - cy;
                     dist = Math.hypot(dx, dy);
                 }
-
                 if (dist < minDist) {
                     // check hit cooldown
                     const lastHit = bt.hitCooldowns.get(z.id) || 0;
-                    if (this.timeElapsed - lastHit > 0.3) {
+                    if (this.timeElapsed - lastHit > 0.5) {
                         bt.hitCooldowns.set(z.id, this.timeElapsed);
-                        
                         // Push away to prevent overlap (always)
                         const pushDist = minDist - dist;
                         const pushX = (dx / dist) * pushDist;
                         const pushY = (dy / dist) * pushDist;
                         z.x += pushX;
                         z.y += pushY;
-                        
                         const angle = Math.atan2(z.y - cy, z.x - cx);
                         const contactX = cx + Math.cos(angle) * bt.radius;
                         const contactY = cy + Math.sin(angle) * bt.radius;
-
                         z.vx = (dx / dist) * 600;
                         z.vy = (dy / dist) * 600;
                         z.bounceTimer = 0.5;
                         z.maxBounceTimer = 0.5;
-
                         // 3.「子彈陀螺」/「陷阱陀螺」每次碰撞到敵人時，要額外乘以50%機率去決定該下碰撞傷害是否成立，若成立，才會進行敵人擊殺機率運算。
                         if (Math.random() < 0.5) {
                             const ownerId = bt.ownerPlayerId || "top_0";
                             (z as any).lastKillerId = ownerId;
-                            
-                            // Apply 20 damage
-                            z.hp -= 20;
-
                             // Apply damage to zombie (this runs hit count and instakill/enemy kill probability checks)
                             GameUtils.applyDamageToZombie(this, z, 20, ownerId);
-                            
                             z.flashTimer = 0.1;
                             let mainColor = '#fbbf24'; // default
                             if (z.type === 'zombie_boss') {
@@ -1304,28 +1195,22 @@ export class GameEngine {
                             EffectSystem.addParticles(this, contactX, contactY, mainColor, 8, 160, 4);
                             EffectSystem.addParticles(this, contactX, contactY, '#ffffff', 4, 200, 3);
                             SoundSystem.play("Attack_Slash_020");
-                            
                             // Check if zombie is killed (hp <= 0)
                             if (z.hp <= 0) {
                                 const isAlreadyDying = (z as any).isDying;
                                 if (!isAlreadyDying && !(z as any).ticketsSpawned) {
                                     (z as any).ticketsSpawned = true;
-
                                     const isBoss = z.type === 'zombie_boss';
                                     const isBig = z.type === 'zombie_big' || z.type === 'zombie_bomb' || z.type === 'zombie_bouncing';
-
                                     // spawn explosion
                                     EffectSystem.spawnSkillKillExplosion(this, z.x, z.y, isBoss);
-
                                     // score calculation
                                     const points = isBoss ? 500 : (isBig ? 50 : 10);
                                     const ownerMatch = ownerId.match(/\d+/);
                                     const ownerIdx = ownerMatch ? parseInt(ownerMatch[0], 10) : 0;
                                     this.addScore(ownerIdx, points);
-
                                     // Spawn tickets immediately, belonging to the owner player's P-position
                                     this.spawnTicket(z.x, z.y, z.type, ownerIdx);
-
                                     // Update kill counts for the owner player
                                     const ownerTop = this.tops.find(t => t.id === ownerId);
                                     if (ownerTop) {
@@ -1335,7 +1220,6 @@ export class GameEngine {
                                             part.kills = ownerTop.kills;
                                         }
                                     }
-
                                     // Call handleZombieDeath to set dying state and trigger proper animations
                                     if (GameUtils.handleZombieDeath(this, z, ownerId)) {
                                         z.markForDeletion = true;
@@ -1349,7 +1233,6 @@ export class GameEngine {
                     }
                 }
             });
-
             if (bt.type !== 'guard_top' && bt.type !== 'trap_top') {
                 // 1. 保證「子彈陀螺」的移動速度在過程中都不會減弱
                 const speed = Math.hypot(bt.vx, bt.vy);
@@ -1364,7 +1247,6 @@ export class GameEngine {
                 }
             }
         });
-
         // 3. 讓多個「子彈陀螺」移動時可以彼此碰撞並發生反彈
         for (let i = 0; i < this.bulletTops.length; i++) {
             const bt1 = this.bulletTops[i];
@@ -1374,48 +1256,39 @@ export class GameEngine {
                 const bt2 = this.bulletTops[j];
                 if (bt2.markForDeletion) continue;
                 if (bt2.type === 'guard_top' || bt2.type === 'trap_top') continue;
-
                 const dx = bt2.x - bt1.x;
                 const dy = bt2.y - bt1.y;
                 const dist = Math.hypot(dx, dy);
                 const minDist = bt1.radius + bt2.radius;
-
                 if (dist < minDist && dist > 0) {
                     const nx = dx / dist;
                     const ny = dy / dist;
-
                     // Push apart to prevent overlap
                     const overlap = minDist - dist;
                     bt1.x -= nx * overlap * 0.5;
                     bt1.y -= ny * overlap * 0.5;
                     bt2.x += nx * overlap * 0.5;
                     bt2.y += ny * overlap * 0.5;
-
                     // Force them to fly apart in opposite directions along the normal
                     const speed1 = bt1.speed || 1200;
                     const speed2 = bt2.speed || 1200;
-
                     bt1.vx = -nx * speed1;
                     bt1.vy = -ny * speed1;
                     bt2.vx = nx * speed2;
                     bt2.vy = ny * speed2;
-
                     // Sound & spark effects
                     SoundSystem.play("Attack_Punch_024");
                     const midX = (bt1.x + bt2.x) / 2;
                     const midY = (bt1.y + bt2.y) / 2;
                     const owner1 = this.tops.find(t => t.id === bt1.ownerPlayerId);
                     const color1 = owner1 ? owner1.color : "#fbbf24";
-                    
                     // Reduced particle counts by 90% (spawning only 1 particle instead of 12)
                     EffectSystem.addParticles(this, midX, midY, color1, 1, 160, 4);
                 }
             }
         }
-
         this.bulletTops = this.bulletTops.filter(bt => !bt.markForDeletion);
     }
-
     private redirectBulletTopToNearestElite(bt: import('./types').BulletTop, angleSpread: number = 0) {
         // Find nearest elite or boss zombie
         const targets = this.zombies.filter(z => 
@@ -1428,7 +1301,6 @@ export class GameEngine {
              z.type === 'zombie_golden' || 
              z.type === 'zombie_black')
         );
-
         let target = null;
         if (targets.length > 0) {
             let minDist = Infinity;
@@ -1453,7 +1325,6 @@ export class GameEngine {
                 });
             }
         }
-
         if (target) {
             const dx = target.x - bt.x;
             const dy = target.y - bt.y;
@@ -1469,7 +1340,6 @@ export class GameEngine {
             }
         }
     }
-
     update(dt: number, realDt: number = dt) {
         this.participants.forEach((p, i) => {
             if (p.selectionState === 'selecting' && p.selectionTimer !== undefined) {
@@ -1477,17 +1347,14 @@ export class GameEngine {
                 // p.selectionTimer -= dt;
             }
         });
-
         // Update spin tutorial timers for player tops
         this.tops.forEach(top => {
             if (top.spinTutorialTimer !== undefined && top.spinTutorialTimer > 0) {
                 top.spinTutorialTimer = Math.max(0, top.spinTutorialTimer - dt);
             }
         });
-
         if (this.hitStopTimer > 0) {
             this.hitStopTimer = Math.max(0, this.hitStopTimer - dt);
-
             if (this.screenShakeTimer > 0) {
                 this.screenShakeTimer = Math.max(0, this.screenShakeTimer - dt);
                 if (this.screenShakeTimer <= 0) {
@@ -1495,23 +1362,19 @@ export class GameEngine {
                     this.screenShakeMaxDuration = 0.9;
                 }
             }
-
             this.afterimages.forEach(img => {
                 img.life -= dt;
             });
             this.afterimages = this.afterimages.filter(img => img.life > 0);
-
             this.slashLines.forEach(line => {
                 line.life -= dt;
             });
             this.slashLines = this.slashLines.filter(line => line.life > 0);
-
             this.xSlashes.forEach(slash => {
                 slash.life -= dt;
                 slash.size = Math.min(slash.maxSize, slash.size + slash.speed * dt);
             });
             this.xSlashes = this.xSlashes.filter(slash => slash.life > 0);
-
             this.particles.forEach(p => {
                 if (p.isSpark) {
                     p.vx *= Math.exp(-2.5 * dt);
@@ -1523,20 +1386,20 @@ export class GameEngine {
                 p.life -= dt;
             });
             this.particles = this.particles.filter(p => p.life > 0);
-
             this.shockwaves.forEach(sw => {
                 sw.radius += sw.speed * dt;
                 sw.life -= dt;
             });
             this.shockwaves = this.shockwaves.filter(sw => sw.life > 0);
-
             return;
         }
-
         // --- Area Transition State Machine ---
         if (this.gameMode === 'campaign') {
+            if (this.bossTransitionPending && !GameUtils.isClashActive(this)) {
+                this.triggerBossTransition();
+            }
             const nextTargetTime = (this.areaCycle + 1) * 120;
-            if (this.timeElapsed >= nextTargetTime && this.areaTransitionState === 'none' && !this.bossSpawned) {
+            if (this.timeElapsed >= nextTargetTime && this.areaTransitionState === 'none' && !this.bossSpawned && !GameUtils.isClashActive(this)) {
                 this.areaTransitionState = 'exploding';
                 this.areaTransitionTimer = 4.0; // 4 seconds of explosion and fade out
                 this.explosionSpawnTimer = 0;
@@ -1545,14 +1408,12 @@ export class GameEngine {
                 this.obstacles = []; // clear all other obstacles (chests, barrels, gears, crates)
                 this.items = []; // clear all items
                 this.concreteBlocks = []; // clear static concrete blocks
-                
                 // Immediately destroy all zombies without dropping items
                 this.zombies.forEach(z => {
                     EffectSystem.addParticles(this, z.x, z.y, '#ff5511', 15, 200, 6);
                 });
                 this.zombies = [];
                 this.zombieSpawningSuspended = true;
-                
                 // Immediately switch players and AIs to standby state, stop sliding and drifting!
                 this.tops.forEach(top => {
                     top.vx = 0;
@@ -1562,14 +1423,11 @@ export class GameEngine {
                     top.state = 'standby';
                 });
             }
-
             if (this.areaTransitionState !== 'none') {
                 this.areaTransitionTimer -= dt;
-
                 if (this.areaTransitionState === 'exploding') {
                     // Determine overlay white alpha: fade out to white over the 4 seconds buffer
                     this.areaTransitionOverlayAlpha = Math.min(1.0, (4.0 - this.areaTransitionTimer) / 4.0);
-
                     // Continuous random explosions/shockwaves on the stage field
                     this.explosionSpawnTimer -= dt;
                     if (this.explosionSpawnTimer <= 0) {
@@ -1578,7 +1436,6 @@ export class GameEngine {
                         const cy = this.activeArenaCenterY ?? 540;
                         const ex = 100 + Math.random() * (CANVAS_W - 200);
                         const ey = cy - 440 + Math.random() * 880;
-                        
                         EffectSystem.addParticles(this, ex, ey, '#ff5511', 25, 260, 9);
                         EffectSystem.addParticles(this, ex, ey, '#ffdd33', 15, 200, 6);
                         this.shockwaves.push({
@@ -1593,7 +1450,6 @@ export class GameEngine {
                             maxLife: 0.45
                         });
                     }
-
                     if (this.areaTransitionTimer <= 0) {
                         if (this.bossDefeated) {
                             // Returning from Boss fight back to Area 1
@@ -1612,34 +1468,28 @@ export class GameEngine {
                                 this.onMusicChange(this.areaCycle % 2 === 0 ? 'area1' : 'area2');
                             }
                         }
-                        
                         // Toggle between North (540) and South (1620)
                         const newCenterY = this.areaCycle % 2 === 0 ? 540 : 1620;
                         const deltaY = newCenterY - this.activeArenaCenterY;
                         this.activeArenaCenterY = newCenterY;
-
                         // Regenerate and spawn obstacles/chests for the new battlefield
                         this.obstacles = [];
                         this.items = [];
                         this.concreteBlocks = [];
                         this.activeLaunchPads = [];
                         this.generateConcreteBlocksForCenter(newCenterY);
-
                         // Reset spawn timers exactly like the first battlefield's startup (initGame)
                         this.chestSpawnTimer = 0;
                         this.obstacleTimer = 0;
                         this.starSpawnTimer = 0;
                         this.launchPadSpawnTimer = 0;
-
                         // Move other transient visual assets
                         this.particles.forEach(p => p.y += deltaY);
                         this.shockwaves.forEach(s => s.y += deltaY);
                         this.slashLines.forEach(l => { l.y1 += deltaY; l.y2 += deltaY; });
                         this.xSlashes.forEach(s => s.y += deltaY);
-
                         // Snap camera instantly to prevent visible panning
                         this.camera.y = newCenterY;
-
                         const cy = this.activeArenaCenterY;
                         const cornerXLeft = 190;
                         const cornerXRight = CANVAS_W - 190;
@@ -1651,13 +1501,11 @@ export class GameEngine {
                             { x: cornerXLeft, y: cornerYTop },
                             { x: cornerXRight, y: cornerYTop }
                         ];
-
                         // Reposition tops to corners and set to launchPadState
                         this.tops.forEach(top => {
                             if (top.hp > 0 && !top.isExploding && !top.markForDeletion) {
                                 const matchIdx = top.id.match(/\d+/);
                                 const pIdx = matchIdx ? parseInt(matchIdx[0], 10) : 0;
-                                
                                 top.x = cornerPos[pIdx].x;
                                 top.y = cornerPos[pIdx].y;
                                 top.vx = 0;
@@ -1672,11 +1520,9 @@ export class GameEngine {
                                     top.standbyCenterY += deltaY;
                                 }
                                 top.state = 'standby';
-                                
                                 EffectSystem.addParticles(this, top.x, top.y, top.color, 40, 300, 10);
                             }
                         });
-
                         this.areaTransitionState = 'fade_in';
                         this.areaTransitionTimer = 1.0; // 1 second fade in
                         if (this.collectiveKeys >= 5) {
@@ -1685,11 +1531,9 @@ export class GameEngine {
                     }
                 } else if (this.areaTransitionState === 'fade_in') {
                     this.areaTransitionOverlayAlpha = Math.max(0.0, this.areaTransitionTimer / 1.0);
-
                     if (this.areaTransitionTimer <= 0) {
                         this.areaTransitionState = 'none';
                         this.areaTransitionOverlayAlpha = 0;
-                        
                         if (this.transitionBgChanged && !this.bossSpawned && this.collectiveKeys >= 5) {
                             this.zombieSpawningSuspended = true;
                             SpawnSystem.spawnBoss(this);
@@ -1699,14 +1543,12 @@ export class GameEngine {
                         this.spawnTimer = 0;
                     }
                 }
-
                 if (this.areaTransitionState === 'exploding') {
                     this.afterimages = []; // Clear trails
                     this.particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; });
                     this.particles = this.particles.filter(p => p.life > 0);
                     this.shockwaves.forEach(sw => { sw.radius += sw.speed * dt; sw.life -= dt; });
                     this.shockwaves = this.shockwaves.filter(sw => sw.life > 0);
-
                     this.tops.forEach(top => {
                         top.vx = 0;
                         top.vy = 0;
@@ -1715,12 +1557,10 @@ export class GameEngine {
                         top.state = 'standby';
                         updateTopStandby(top, this, dt);
                     });
-                    
                     return; // PAUSE GAME LOGIC DURING EXPLODING
                 }
             }
         }
-
         if (this.screenShakeTimer > 0) {
             this.screenShakeTimer = Math.max(0, this.screenShakeTimer - dt);
             if (this.screenShakeTimer <= 0) {
@@ -1728,35 +1568,29 @@ export class GameEngine {
                 this.screenShakeMaxDuration = 0.9;
             }
         }
-
         if (this.introActive) {
             this.afterimages.forEach(img => {
                 img.life -= dt;
             });
             this.afterimages = this.afterimages.filter(img => img.life > 0);
-
             this.particles.forEach(p => {
                 p.x += p.vx * dt;
                 p.y += p.vy * dt;
                 p.life -= dt;
             });
             this.particles = this.particles.filter(p => p.life > 0);
-
             this.shockwaves.forEach(sw => {
                 sw.radius += sw.speed * dt;
                 sw.life -= dt;
             });
             this.shockwaves = this.shockwaves.filter(sw => sw.life > 0);
-
             this.tops.forEach(top => {
                 const spinPct = top.spin / MAX_SPIN;
                 const visualSpinFactor = top.spin > 0 ? (0.175 + 0.825 * spinPct) : 0;
                 top.angle += visualSpinFactor * Math.PI * 18 * dt * 0.7;
             });
-
             if (this.introStage === 'ready_spin') {
                 this.introTimer = Math.max(0, this.introTimer - dt);
-
                 // Tops spin in place next to UI while waiting
                 this.tops.forEach(top => {
                     if (top.isAI) {
@@ -1771,13 +1605,11 @@ export class GameEngine {
                             (top as any).introNextAiSpinTime = time + 0.15 + Math.random() * 0.15;
                         }
                     }
-
                     if ((top as any).introShake && (top as any).introShake > 0) {
                         (top as any).introShake -= dt * 25; // rapidly decay shake
                         if ((top as any).introShake < 0) (top as any).introShake = 0;
                     }
                 });
-
                 if (this.introTimer <= 0) {
                     this.introStage = 'center_dash';
                     this.introTimer = 0.5; // dash to center takes 0.5 sec
@@ -1788,19 +1620,16 @@ export class GameEngine {
                     const cornerXRight = CANVAS_W - padding - barW / 2;
                     const cornerYTop = padding + 175;
                     const cornerYBottom = CANVAS_H - 130 - 65;
-
                     const localCornerPos = [
                         { x: cornerXLeft, y: cornerYBottom }, // P1
                         { x: cornerXRight, y: cornerYBottom }, // P2
                         { x: cornerXLeft, y: cornerYTop }, // P3
                         { x: cornerXRight, y: cornerYTop } // P4
                     ];
-
                     this.tops.forEach((top) => {
                         const originalIndex = parseInt(top.id.split('_')[1], 10);
                         const startPos = localCornerPos[originalIndex] || localCornerPos[0];
                         (top as any).introShake = 0;
-                        
                         // Strong Launch Effect
                         this.shockwaves.push({
                             x: startPos.x,
@@ -1813,7 +1642,6 @@ export class GameEngine {
                             maxLife: 0.8,
                             color: top.color || '#ffffff'
                         });
-
                         for (let k = 0; k < 40; k++) {
                             const angle = Math.random() * Math.PI * 2;
                             const speed = 300 + Math.random() * 500;
@@ -1832,36 +1660,29 @@ export class GameEngine {
                 }
             } else if (this.introStage === 'center_dash') {
                 this.introTimer = Math.max(0, this.introTimer - dt);
-                
                 // Dash animation from corner pos to standbyCenter pos
                 const t = 1.0 - (this.introTimer / 0.5);
                 const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-                
                 const padding = 24;
                 const barW = 210;
                 const cornerXLeft = padding + barW / 2;
                 const cornerXRight = CANVAS_W - padding - barW / 2;
                 const cornerYTop = padding + 175;
                 const cornerYBottom = CANVAS_H - 130 - 65;
-
                 const cornerPos = [
                     { x: cornerXLeft, y: cornerYBottom }, // P1
                     { x: cornerXRight, y: cornerYBottom }, // P2
                     { x: cornerXLeft, y: cornerYTop }, // P3
                     { x: cornerXRight, y: cornerYTop } // P4
                 ];
-                
                 this.tops.forEach((top) => {
                     const originalIndex = parseInt(top.id.split('_')[1], 10);
                     const startPos = cornerPos[originalIndex] || cornerPos[0];
                     const targetPos = { x: top.standbyCenterX!, y: top.standbyCenterY! };
-                    
                     top.x = startPos.x + (targetPos.x - startPos.x) * ease;
                     top.y = startPos.y + (targetPos.y - startPos.y) * ease;
-                    
                     // Parabolic arc for visually jumping into the arena
                     top.introZ = Math.sin(t * Math.PI) * 450; // Jump up to 450px high
-
                     // Add some trail particles
                     if (Math.random() < 0.6) {
                         this.particles.push({
@@ -1876,13 +1697,11 @@ export class GameEngine {
                         });
                     }
                 });
-
                 if (this.introTimer <= 0) {
                     this.introStage = 'message';
                     this.messageTimer = 2.4;
                     this.screenShakeTimer = 1.2;
                     SoundSystem.play('jump');
-
                     this.tops.forEach(top => {
                         top.introZ = 0;
                         this.shockwaves.push({
@@ -1896,14 +1715,12 @@ export class GameEngine {
                             life: 0.5,
                             maxLife: 0.5
                         });
-
                         EffectSystem.addParticles(this, top.x, top.y, top.color, 45, 280, 10);
                         EffectSystem.addGreyWallCollisionParticles(this, top.x, top.y, 15, 8);
                     });
                 }
             } else if (this.introStage === 'message') {
                 this.messageTimer = Math.max(0, this.messageTimer - dt);
-                
                 const elapsed = 2.4 - this.messageTimer;
                 if (elapsed < 1.0) {
                     this.tops.forEach(top => {
@@ -1918,7 +1735,6 @@ export class GameEngine {
                         updateTopStandby(top, this,  dt);
                     });
                 }
-
                 if (this.messageTimer <= 0) {
                     this.introActive = false;
                     this.introStage = 'none';
@@ -1929,23 +1745,19 @@ export class GameEngine {
                 }
             } else if (this.introStage === 'boss_falling') {
                 this.introTimer = Math.max(0, this.introTimer - dt);
-                
                 // Find Stage 2 Boss zombie in current zombies list
                 const boss = this.zombies.find(z => z.type === 'zombie_boss');
                 if (boss) {
                     (boss as any).introZ = Math.max(0, 1500 * Math.pow(this.introTimer / 2.0, 2));
                 }
-
                 if (this.introTimer <= 0) {
                     this.introStage = 'boss_message';
                     SoundSystem.play('SE-Warning1');
                     this.messageTimer = 1.6;
                     this.screenShakeTimer = 1.5;
                     this.screenShakeIntensity = 18;
-
                     if (boss) {
                         (boss as any).introZ = 0;
-
                         // Create huge epicenter slam landing shockwave
                         this.shockwaves.push({
                             x: boss.x,
@@ -1958,7 +1770,6 @@ export class GameEngine {
                             life: 0.7,
                             maxLife: 0.7
                         });
-
                         // Massive fire and stone dust particle slam
                         EffectSystem.addParticles(this, boss.x, boss.y, '#ea580c', 80, 500, 16);
                         EffectSystem.addParticles(this, boss.x, boss.y, '#dc2626', 45, 350, 10);
@@ -1968,14 +1779,12 @@ export class GameEngine {
                 }
             } else if (this.introStage === 'boss_message') {
                 this.messageTimer = Math.max(0, this.messageTimer - dt);
-                
                 // Update players circling cleanly in standby, unless they are waiting on a launch pad
                 this.tops.forEach(top => {
                     if (!top.launchPadState) {
                         updateTopStandby(top, this, dt);
                     }
                 });
-
                 if (this.messageTimer <= 0) {
                     this.introActive = false;
                     this.introStage = 'none';
@@ -1985,7 +1794,6 @@ export class GameEngine {
             }
             return;
         }
-
         if (this.versusEndActive) {
             this.versusEndTimer -= dt;
             if (this.versusEndTimer <= 0) {
@@ -1994,7 +1802,6 @@ export class GameEngine {
                 return;
             }
         }
-
         if (!this.versusEndActive) {
             if (!this.isTimerLocked) {
                 this.timeRemaining -= dt;
@@ -2003,7 +1810,6 @@ export class GameEngine {
             if (this.timeRemaining <= 0) {
                 this.timeRemaining = 0;
             }
-
             // Multiplayer launch pad spawn manager:
             const activatedTopsCount = this.tops.length;
             const isTransitioning = this.areaTransitionState !== 'none';
@@ -2011,13 +1817,10 @@ export class GameEngine {
                 this.multiplayerLaunchPadTimer = (this.multiplayerLaunchPadTimer ?? 0) + dt;
                 if (this.multiplayerLaunchPadTimer >= 20) {
                     this.multiplayerLaunchPadTimer = 0;
-                    
                     // Forcefully remove other launch pads
                     this.activeLaunchPads = [];
-                    
                     // Reset standard pad spawn timer
                     this.launchPadSpawnTimer = 0;
-
                     const cy = this.activeArenaCenterY ?? 540;
                     this.activeLaunchPads.push({
                         id: 'pad_multiplayer',
@@ -2027,7 +1830,6 @@ export class GameEngine {
                         isMultiplayer: true,
                         lifeTimer: 15
                     });
-
                     // Trigger giant Gold/Yellow expanding circular light shockwave
                     this.shockwaves.push({
                         x: 960,
@@ -2044,14 +1846,12 @@ export class GameEngine {
                 }
             } else {
                 this.multiplayerLaunchPadTimer = 0;
-                
                 // If only 1 player remains and a multiplayer pad is on field, clean it up and release waiting tops
                 const hasMultiplayerPad = this.activeLaunchPads.some(p => p.id === 'pad_multiplayer');
                 if (hasMultiplayerPad) {
                     this.activeLaunchPads = this.activeLaunchPads.filter(p => p.id !== 'pad_multiplayer');
                 }
             }
-
             // Process pad lifetimers
             this.activeLaunchPads.forEach(pad => {
                 if (pad.lifeTimer !== undefined) {
@@ -2063,7 +1863,6 @@ export class GameEngine {
                 // Remove expired pads and release any waiting tops
                 this.activeLaunchPads = this.activeLaunchPads.filter(p => p.lifeTimer === undefined || p.lifeTimer > 0);
             }
-
             // Master check for multiplayer launch pad satisfaction
             const mPad = this.activeLaunchPads.find(p => p.id === 'pad_multiplayer');
             if (mPad) {
@@ -2074,7 +1873,6 @@ export class GameEngine {
                 });
                 if (allIn) {
                     SoundSystem.play('SRW_Lock_01'); // nice locked-in sound
-                    
                     // Trigger multiplayer launch for all tops!
                     aliveHumanTops.forEach((t, idx) => {
                         t.launchPadState = 'prep_spinning';
@@ -2084,11 +1882,9 @@ export class GameEngine {
                         t.vx = 0;
                         t.vy = 0;
                         t.state = 'dash';
-                        
                         if (this.zombieSiegeActive && this.siegeTargetPlayerId === t.id) {
                             EventSystem.cancelZombieSiege(this);
                         }
-
                         (t as any).multiplayerLaunchStage = 1;
                         (t as any).launchPadStartYCenter = this.activeArenaCenterY ?? 540;
                         (t as any).launchPadSource = 'multiplayer';
@@ -2096,19 +1892,16 @@ export class GameEngine {
                         (t as any).launchPadStartAngle = idx * (Math.PI * 2 / aliveHumanTops.length);
                         t.spin = MAX_SPIN;
                         t.flashTimer = undefined;
-                        
                         // Offset position slightly around the center so they don't perfectly overlap
                         const offsetAngle = idx * (Math.PI * 2 / aliveHumanTops.length);
                         t.x = mPad.x + Math.cos(offsetAngle) * 32;
                         t.y = mPad.y + Math.sin(offsetAngle) * 32;
-                        
                         if (!t.isAI) {
                             SoundSystem.play('SE-Heal1');
                             SoundSystem.play('Mech_Move_011');
                         }
                         EffectSystem.addParticles(this, t.x, t.y, '#ffffff', 30, 200, 8);
                     });
-
                     this.shockwaves.push({
                         x: mPad.x,
                         y: mPad.y,
@@ -2121,13 +1914,11 @@ export class GameEngine {
                         maxLife: 0.5,
                         isRainbow: true
                     });
-
                     // Remove multiplayer pad
                     this.activeLaunchPads = this.activeLaunchPads.filter(p => p.id !== mPad.id);
                     SoundSystem.play('ui_confirm');
                 }
             }
-
             // Launch pad dynamic spawn manager:
             // "彈射區的生成，改成從戰鬥開始後，每隔10秒鐘生成隨機一個彈射區在場上。"
             // "場上同時間只能存在1個彈射區。"
@@ -2152,9 +1943,7 @@ export class GameEngine {
                             chosen = pool[Math.floor(Math.random() * pool.length)];
                             attempts++;
                         } while (chosen.id === this.lastSpawnedLaunchPadId && attempts < 50);
-
                         this.lastSpawnedLaunchPadId = chosen.id;
-
                         if (chosen.id === 'pad_bounce_tl') {
                             chosen.x = 560;
                             chosen.y = cy - 400; // was 140
@@ -2165,7 +1954,6 @@ export class GameEngine {
                             chosen.arrowAngle = Math.PI * 0.75;
                         }
                         this.activeLaunchPads = [chosen];
-
                         // Trigger a beautiful expanding rainbow circular light effect at spawn location!
                         this.shockwaves.push({
                             x: chosen.x,
@@ -2186,18 +1974,7 @@ export class GameEngine {
                 }
             }
         }
-
         if (this.gameMode === 'campaign') {
-            // "1.闖關模式中，每隔30秒，會觸發"殭屍包圍"事件。"
-            // DISABLED PER USER REQUEST
-            if (!this.versusEndActive && !this.introActive && !this.isGameOver && !this.zombieSpawningSuspended) {
-                // this.zombieSiegeTimer -= dt;
-                if (this.zombieSiegeTimer <= 0) {
-                    this.zombieSiegeTimer = 30.0;
-                    // EventSystem.spawnSiegeWarningZone(this);
-                }
-            }
-
             if (this.siegeWarningZone) {
                 if (this.zombieSpawningSuspended || GameUtils.isClashActive(this)) {
                     this.siegeWarningZone = null;
@@ -2209,7 +1986,6 @@ export class GameEngine {
                             // Stick warning zone position to the moving player
                             this.siegeWarningZone.x = player.x;
                             this.siegeWarningZone.y = player.y;
-                            
                             if (this.siegeWarningZone.timer >= 1.0) {
                                 EventSystem.triggerZombieSiege(this, player, { x: player.x, y: player.y });
                                 this.siegeWarningZone = null;
@@ -2218,7 +1994,7 @@ export class GameEngine {
                             this.siegeWarningZone = null;
                         }
                     } else {
-                        if (this.siegeWarningZone.timer < 5.0) {
+                        if (this.siegeWarningZone.timer < 14.0) {
                             const activePlayers = this.tops.filter(t => !t.isAI && !t.isExploding && t.hp > 0 && t.launchPadState === undefined);
                             for (const player of activePlayers) {
                                 const dist = Math.hypot(player.x - this.siegeWarningZone.x, player.y - this.siegeWarningZone.y);
@@ -2228,30 +2004,24 @@ export class GameEngine {
                                     break;
                                 }
                             }
-                        } else if (this.siegeWarningZone.timer >= 6.0) {
+                        } else if (this.siegeWarningZone.timer >= 15.0) {
                             this.siegeWarningZone = null;
                         }
                     }
                 }
             }
-
             if (this.zombieSiegeActive) {
                 EventSystem.updateZombieSiege(this, dt);
             }
-
-
-
             // Spawn logic: Spawn on schedule if we haven't reached limits (small limit is 20, big is 6)
             // No spawning suspension is locked/triggered when counts are high
             if (!this.zombieSpawningSuspended) {
                 this.spawnTimer += dt;
-                
                 // Scale spawn interval based on participating human players (minimum 1, maximum multiplier of 1.8x)
                 const humanPlayers = this.participants ? this.participants.filter(p => !p.isAI).length : 0;
                 const playerCount = humanPlayers > 0 ? humanPlayers : 1;
                 const scaleMultiplier = Math.min(1.8, 1.0 + (playerCount - 1) * 0.267);
                 const spawnInterval = 0.75 / scaleMultiplier;
-
                 if (this.spawnTimer > spawnInterval) {
                     this.spawnTimer = 0;
                     if (!this.bossSpawned) {
@@ -2259,20 +2029,21 @@ export class GameEngine {
                         SpawnSystem.spawnZombie(this);
                     }
                 }
-                
-                this.goldenZombieTimer += dt;
-                if (this.goldenZombieTimer >= 30.0) {
-                    this.goldenZombieTimer = 0;
+                this.specialEnemyTimer += dt;
+                if (this.specialEnemyTimer >= 20.0) {
+                    this.specialEnemyTimer = 0;
                     if (!this.bossSpawned) {
-                        SpawnSystem.spawnGoldenZombie(this);
-                    }
-                }
-                
-                this.blackZombieTimer += dt;
-                if (this.blackZombieTimer >= 30.0) {
-                    this.blackZombieTimer = 0;
-                    if (!this.bossSpawned) {
-                        SpawnSystem.spawnBlackZombie(this);
+                        const types = ['golden', 'black', 'surround'].filter(t => t !== this.lastSpecialEnemyType);
+                        const nextType = types[Math.floor(Math.random() * types.length)];
+                        this.lastSpecialEnemyType = nextType;
+                        
+                        if (nextType === 'golden') {
+                            SpawnSystem.spawnGoldenZombie(this);
+                        } else if (nextType === 'black') {
+                            SpawnSystem.spawnBlackZombie(this);
+                        } else if (nextType === 'surround') {
+                            EventSystem.spawnSiegeWarningZone(this);
+                        }
                     }
                 }
             }
@@ -2283,7 +2054,6 @@ export class GameEngine {
                 // Stopped spawning landmine objects (obstacle_barrel) per user request
                 // SpawnSystem.spawnItemOrObstacle(this, 'obstacle_barrel');
             }
-
             const hasChest = this.obstacles.some(o => o.type === 'obstacle_chest' && !o.markForDeletion);
             const hasSpecialWeapons = this.bulletTops.some(bt => !bt.markForDeletion);
             if (!hasChest && !hasSpecialWeapons) {
@@ -2293,33 +2063,27 @@ export class GameEngine {
                 this.chestSpawnTimer = 0;
                 SpawnSystem.spawnChest(this);
             }
-
             this.starSpawnTimer += dt;
             if (this.starSpawnTimer > 30.0) {
                 this.starSpawnTimer = 0;
                 // Star item spawning is disabled per user request
                 // SpawnSystem.spawnItemOrObstacle(this, 'item_crate');
             }
-
         // Update Phantom Clones (Model 3 Skill)
         this.phantomClones.forEach(pc => {
             pc.life = Math.max(0, pc.life - dt);
-            
             // Spin / Rotation of top body
             const visualSpinFactor = 1.0;
             pc.angle += visualSpinFactor * Math.PI * 18 * dt * 0.7;
-
             // Stands/Orbit revolving around spawn centerX/Y
             const orbitSpeed = 8.0; // max speed
             pc.orbitAngle = pc.orbitAngle - orbitSpeed * dt;
-
             // Solve revolving spiral coordinates
             const rBase = 157.5;
             const c = 0.25;
             const r = rBase * 0.7 * (0.85 + 0.5 * Math.sin(c * pc.orbitAngle));
             pc.x = pc.centerX + r * Math.cos(pc.orbitAngle);
             pc.y = pc.centerY + r * Math.sin(pc.orbitAngle);
-
             // Update hit cooldowns
             for (const [targetId, cooldown] of pc.hitCooldowns.entries()) {
                 if (cooldown > 0) {
@@ -2328,7 +2092,6 @@ export class GameEngine {
                     pc.hitCooldowns.delete(targetId);
                 }
             }
-
             // Spawn lovely tracking cyber blue particles on orbit
             let cloneAlpha = 1.0;
             if (pc.life > pc.maxLife - 0.6) {
@@ -2336,18 +2099,15 @@ export class GameEngine {
             } else if (pc.life < 0.6) {
                 cloneAlpha = Math.max(0, Math.min(1.0, pc.life / 0.6));
             }
-
             if (Math.random() < 0.3 * cloneAlpha) {
                 const cols = ['#38bdf8', '#0ea5e9', '#7dd3fc', '#ffffff'];
                 const col = cols[Math.floor(Math.random() * cols.length)];
                 EffectSystem.addParticles(this, pc.x, pc.y, col, 1, 90, 2.5);
             }
-
             // --- Collisions with Zombies ---
             const cycloneRadius = pc.radius + 80; // 128
             this.zombies.forEach(z => {
                 if (z.markForDeletion || z.hp <= 0 || (z as any).isSiegeZombie) return;
-
                 const dist = Math.hypot(z.x - pc.x, z.y - pc.y);
                 if (dist <= cycloneRadius + z.radius) {
                     const currentCd = pc.hitCooldowns.get(z.id) ?? 0;
@@ -2356,7 +2116,6 @@ export class GameEngine {
                         GameUtils.applyDamageToZombie(this, z, 1, pc.ownerId);
                         z.flashTimer = isBoss ? 0.35 : 0.15;
                         pc.hitCooldowns.set(z.id, isBoss ? 1.0 : 0.25);
-
                         const isBig = z.type === 'zombie_big' || z.type === 'zombie_bomb' || z.type === 'zombie_bouncing';
                         let mainColor = '#22c55e';
                         if (isBoss) {
@@ -2368,10 +2127,8 @@ export class GameEngine {
                         } else if (z.type === 'zombie_bouncing') {
                             mainColor = '#be185d';
                         }
-
                         EffectSystem.addParticles(this, z.x, z.y, mainColor, 6, 120, 3);
                         EffectSystem.addParticles(this, z.x, z.y, '#ffffff', 2, 150, 2);
-
                         if (z.hp <= 0) {
                             const isAlreadyDying = (z as any).isDying;
                             if (!isAlreadyDying) {
@@ -2381,7 +2138,6 @@ export class GameEngine {
                                 if (owner) {
                                     owner.kills = (owner.kills ?? 0) + 1;
                                 }
-
                                 this.shockwaves.push({
                                     x: z.x,
                                     y: z.y,
@@ -2400,21 +2156,17 @@ export class GameEngine {
                     }
                 }
             });
-
             // --- Collisions with Other Player Tops (Versus Mode) ---
             if (this.gameMode === 'versus') {
                 this.tops.forEach(otherTop => {
                     if (otherTop.id === pc.ownerId || otherTop.markForDeletion || otherTop.isExploding || otherTop.hp <= 0) return;
-
                     const dist = Math.hypot(otherTop.x - pc.x, otherTop.y - pc.y);
                     if (dist <= cycloneRadius + otherTop.radius) {
                         const currentCd = pc.hitCooldowns.get(otherTop.id) ?? 0;
                         if (currentCd <= 0 && (otherTop.hitCooldown === undefined || otherTop.hitCooldown <= 0)) {
                             otherTop.hitCooldown = 1.0;
                             pc.hitCooldowns.set(otherTop.id, 0.25);
-
                             EffectSystem.addParticles(this, otherTop.x, otherTop.y, '#ffffff', 4, 180, 4);
-
                             // repulsion
                             const dx = otherTop.x - pc.x;
                             const dy = otherTop.y - pc.y;
@@ -2428,10 +2180,8 @@ export class GameEngine {
                 });
             }
         });
-
         // Filter and keep live clones
         this.phantomClones = this.phantomClones.filter(pc => pc.life > 0);
-
         // Update Tops
         this.tops.forEach(top => {
             // Age and filter concentric rings & max spin halos regardless of state
@@ -2443,7 +2193,6 @@ export class GameEngine {
                 });
                 top.contractRings = top.contractRings.filter((ring: any) => ring.radius > top.radius);
             }
-
             if (top.maxSpinHalos) {
                 top.maxSpinHalos.forEach((halo: any) => {
                     halo.life -= dt;
@@ -2452,11 +2201,9 @@ export class GameEngine {
                 });
                 top.maxSpinHalos = top.maxSpinHalos.filter((halo: any) => halo.life > 0);
             }
-
             const wasMaxSpin = (top as any).prevSpin !== undefined && (top as any).prevSpin >= MAX_SPIN;
             const isNowMaxSpin = top.spin >= MAX_SPIN;
             (top as any).prevSpin = top.spin;
-
             // Check Launch Pad entry overlap first (only if top is alive, not in launchPadState, not in ultimate skill, and not during active clash events)
             if (!top.isExploding && top.hp > 0 && top.launchPadState === undefined && !GameUtils.isClashActive(this)) {
                 const inModel1Skill = top.skillActiveTimer !== undefined && top.skillActiveTimer > 0;
@@ -2485,12 +2232,10 @@ export class GameEngine {
                                 top.vy = 0;
                                 top.spin = MAX_SPIN;
                                 top.flashTimer = undefined; // Clear any active damage flash white indicator upon entering launch pad
-                                
                                 // Immediately cancel active zombie siege, scattering the zombies and turning them into standard zombies
                                 if (this.zombieSiegeActive && this.siegeTargetPlayerId === top.id) {
                                     EventSystem.cancelZombieSiege(this);
                                 }
-                                
                                 this.shockwaves.push({
                                     x: pad.x,
                                     y: pad.y,
@@ -2502,7 +2247,6 @@ export class GameEngine {
                                     life: 0.25,
                                     maxLife: 0.25
                                 });
-
                                 // Remove this launch pad immediately upon entry!
                                 this.activeLaunchPads = this.activeLaunchPads.filter(p => p.id !== pad.id);
                             }
@@ -2511,7 +2255,6 @@ export class GameEngine {
                     }
                 }
             }
-
             // Dynamically calculate and assign scale-dependent radius for collision detection
             const currentScaleFactor = GameUtils.getTopScale(this, top);
             let collisionScale = currentScaleFactor;
@@ -2519,23 +2262,19 @@ export class GameEngine {
                 collisionScale *= 1.25;
             }
             top.radius = TOP_RADIUS * collisionScale;
-
             // Smoothly interpolate the spin value to avoid sudden radius/size jumps
             if (top.smoothSpin === undefined) {
                 top.smoothSpin = top.spin ?? MAX_SPIN;
             }
             top.smoothSpin += ((top.spin ?? MAX_SPIN) - top.smoothSpin) * (1 - Math.exp(-8 * dt));
-
             // Decrement deadlock cooldown timer
             if (top.deadlockCooldownTimer !== undefined && top.deadlockCooldownTimer > 0) {
                 top.deadlockCooldownTimer = Math.max(0, top.deadlockCooldownTimer - dt);
             }
-
             // Decrement cyclone hit cooldown
             if (top.cycloneHitCooldown !== undefined && top.cycloneHitCooldown > 0) {
                 top.cycloneHitCooldown = Math.max(0, top.cycloneHitCooldown - dt);
             }
-
             // --- LAUNCH PAD STATE TIMER & FLIGHT UPDATES ---
             if (top.launchPadState !== undefined) {
                 // Keep energy at least at 1 point during the catapult/launch process
@@ -2543,15 +2282,12 @@ export class GameEngine {
                     top.hp = 1;
                     top.visualHp = top.visualHp !== undefined ? Math.max(top.hp, top.visualHp) : top.hp;
                 }
-
                 // visual spin at 10 grids (spinPct = 1.0, spinFactor = 1.0)
                 // Using 18 * Math.PI * dt * 0.7 to avoid stroboscopic wagon-wheel aliasing
                 top.angle += 1.0 * Math.PI * 18 * dt * 0.7;
-                
                 top.spin = MAX_SPIN;
                 top.smoothSpin = MAX_SPIN;
                 top.flashTimer = undefined; // Force flashTimer to undefined to prevent any damage white flash during launch pad actions
-
                 if (!top.axisTrail) {
                     top.axisTrail = [];
                 }
@@ -2559,7 +2295,6 @@ export class GameEngine {
                     p.life -= dt;
                 });
                 top.axisTrail = top.axisTrail.filter(p => p.life > 0);
-
                 if (top.launchPadState === 'flying' || top.launchPadState === 'dashing') {
                     top.axisTrail.push({
                         x: top.x,
@@ -2571,7 +2306,6 @@ export class GameEngine {
                     if (top.axisTrail.length > 80) {
                         top.axisTrail.shift();
                     }
-
                     // High-speed electric particles!
                     if (Math.random() < 0.45) {
                         const topSpeed = Math.hypot(top.vx, top.vy);
@@ -2588,11 +2322,9 @@ export class GameEngine {
                         }
                         const bX = - dirX * 110 * (0.5 + Math.random() * 0.5);
                         const bY = - dirY * 110 * (0.5 + Math.random() * 0.5);
-                        
                         const cols = ['#ffffff', '#60a5fa', '#38bdf8', top.color];
                         const col = cols[Math.floor(Math.random() * cols.length)];
                         const size = Math.random() * 6 + 4;
-                        
                         this.particles.push({
                             x: top.x,
                             y: top.y,
@@ -2606,7 +2338,6 @@ export class GameEngine {
                         } as any);
                     }
                 }
-
                 if (top.superTimer !== undefined && top.superTimer > 0) {
                     top.superTimer = Math.max(0, top.superTimer - dt);
                     }
@@ -2619,32 +2350,26 @@ export class GameEngine {
                 if (top.damageShockTimer !== undefined && top.damageShockTimer > 0) {
                     top.damageShockTimer = Math.max(0, top.damageShockTimer - dt);
                 }
-
                 const getSpeedFactor = (t: any): number => {
                     const tier = t.launchPadSpeedTier ?? 'medium';
                     if (tier === 'slow') return 0.65;
                     if (tier === 'fast') return 1.4;
                     return 1.0;
                 };
-
                 if (top.launchPadState === 'prep_spinning') {
                     top.vx = 0;
                     top.vy = 0;
-                    
                     // Handle AI simulated inputs safely & frame-rate independently
-                    
                     if (this.introStage === 'boss_falling' || this.introStage === 'boss_message' || (this.areaTransitionState === 'fade_in' && this.transitionBgChanged)) {
                         // wait for boss to land and message to finish
                     } else {
                         const defaultTimer = (top as any).launchPadSource === 'multiplayer' ? 2.0 : 1.5;
                         top.launchPadTimer = (top.launchPadTimer ?? defaultTimer) - dt;
                     }
-                    
                     // Add subtle spin preparation particles
                     if (Math.random() < 0.3) {
                         EffectSystem.addParticles(this, top.x, top.y, '#f59e0b', 1, 100, 1.5);
                     }
-                    
                     if (top.launchPadTimer <= 0) {
                         // Determine flight speed tier based on spins accomplished!
                         const count = (top as any).launchPadSource === 'multiplayer' ? 999 : (top.launchPadSpinCount ?? 0);
@@ -2655,10 +2380,8 @@ export class GameEngine {
                         } else {
                             (top as any).launchPadSpeedTier = 'slow';
                         }
-                        
                         // Clear prep states
                         (top as any).launchPadNextAiSpinTime = undefined;
-                        
                         // Visual transition shockwave color depending on speed tier (fast=red, medium=yellow/orange, slow=cyan)
                         const runSpeed = (top as any).launchPadSpeedTier;
                         const col = runSpeed === 'fast' ? '#ef4444' : (runSpeed === 'medium' ? '#f59e0b' : '#38bdf8');
@@ -2673,7 +2396,6 @@ export class GameEngine {
                             life: 0.3,
                             maxLife: 0.3
                         });
-                        
                         // Progress to standard 0.375s pre-flight 'charging' state (shortened by 25% from 0.5s)
                         top.launchPadState = 'charging';
                         top.launchPadTimer = 0.375;
@@ -2682,12 +2404,10 @@ export class GameEngine {
                     top.vx = 0;
                     top.vy = 0;
                     top.launchPadTimer = (top.launchPadTimer ?? 0.375) - dt;
-                    
                     if (Math.random() < 0.45) {
                         EffectSystem.addParticles(this, top.x, top.y, '#06b6d4', 2, 120, 2);
                         EffectSystem.addParticles(this, top.x, top.y, '#ffffff', 1, 150, 3);
                     }
-
                     if (top.launchPadTimer <= 0) {
                         top.launchPadState = 'flying';
                         if (!top.isAI) {
@@ -2721,29 +2441,23 @@ export class GameEngine {
                         top.launchPadTimer = (top.launchPadTimer ?? duration) - dt * f;
                         const elapsed = duration - Math.max(0, top.launchPadTimer);
                         const p = elapsed / duration;
-
                         const cy = (top as any).launchPadStartYCenter ?? 540;
                         const prevX = top.x;
                         const prevY = top.y;
-
                         // Spiral outwards
                         const theta_start = (top as any).launchPadStartAngle ?? 0;
                         const totalTurns = 2.5;
                         const angle = theta_start + p * totalTurns * Math.PI * 2;
                         const radius = 550 * p;
-
                         const rawX = 960 + radius * Math.cos(angle);
                         const rawY = cy + radius * Math.sin(angle);
-
                         const clamped = GameUtils.clampToCapsule(this, rawX, rawY, top.radius || TOP_RADIUS);
                         top.x = clamped.x;
                         top.y = clamped.y;
-
                         if (dt > 0) {
                             top.vx = (top.x - prevX) / dt;
                             top.vy = (top.y - prevY) / dt;
                         }
-
                         // Spark effect and other images
                         if (Math.random() < 0.8) {
                             const originalIdx = parseInt(top.id.split('_')[1], 10);
@@ -2764,18 +2478,14 @@ export class GameEngine {
                         }
                         EffectSystem.addParticles(this, top.x, top.y, '#f59e0b', 3, 200, 2);
                         EffectSystem.addParticles(this, top.x, top.y, top.color, 3, 180, 3);
-
                         GameUtils.dealLaunchPadSweepDamage(this, top, dt);
-
                         if (top.launchPadTimer <= 0) {
                             // Transition to Final dash
                             top.launchPadState = 'dashing';
                             top.launchPadTimer = 0.3; // terminal dash duration
-
                             const targetDir = GameUtils.findLaunchPadNearestTargetDir(this, top);
                             (top as any).launchPadDirX = targetDir.x;
                             (top as any).launchPadDirY = targetDir.y;
-
                             this.shockwaves.push({
                                 x: top.x,
                                 y: top.y,
@@ -2787,7 +2497,6 @@ export class GameEngine {
                                 life: 0.4,
                                 maxLife: 0.4
                             });
-
                             SoundSystem.play('Attack_wave_032');
                         }
                     } else if ((top as any).launchPadSource === 'center') {
@@ -2795,21 +2504,16 @@ export class GameEngine {
                         top.launchPadTimer = (top.launchPadTimer ?? duration) - dt * f;
                         const elapsed = duration - Math.max(0, top.launchPadTimer);
                         const p = elapsed / duration;
-
                         const theta_start = (top as any).launchPadStartAngle ?? 0;
                         const totalTurns = 3.2; // Number of revolutions (spin-out/spin-in)
                         const angle = theta_start + p * totalTurns * Math.PI * 2;
-
                         const maxRadius = 450;
                         const radius = maxRadius * Math.sin(p * Math.PI);
-
                         const prevX = top.x;
                         const prevY = top.y;
                         const cy = (top as any).launchPadStartYCenter ?? 540;
-
                         top.x = 960 + radius * Math.cos(angle);
                         top.y = cy + radius * Math.sin(angle);
-
                         if (dt > 0) {
                             top.vx = (top.x - prevX) / dt;
                             top.vy = (top.y - prevY) / dt;
@@ -2819,25 +2523,19 @@ export class GameEngine {
                         top.launchPadTimer = (top.launchPadTimer ?? duration) - dt * f;
                         const elapsed = duration - Math.max(0, top.launchPadTimer);
                         const p = elapsed / duration;
-
                         const theta_start = (top as any).launchPadStartAngle ?? 0;
                         const totalTurns = 2.0; // 2 full figure 8s
                         const angle = theta_start + p * totalTurns * Math.PI * 2;
-
                         // Start at 200 distance from center, expand to max 600, then go back down to 200.
                         const maxRadiusX = 600;
                         const rX = 200 + (maxRadiusX - 200) * Math.sin(p * Math.PI);
-                        
                         const maxRadiusY = 350;
                         const rY = maxRadiusY * Math.sin(p * Math.PI);
-
                         const prevX = top.x;
                         const prevY = top.y;
                         const cy = (top as any).launchPadStartYCenter ?? 540;
-
                         top.x = 960 + rX * Math.cos(angle);
                         top.y = cy + rY * Math.sin(angle * 2);
-
                         if (dt > 0) {
                             top.vx = (top.x - prevX) / dt;
                             top.vy = (top.y - prevY) / dt;
@@ -2846,43 +2544,35 @@ export class GameEngine {
                         const duration = 1.5; // shortened 25% from 2.0
                         top.launchPadTimer = (top.launchPadTimer ?? duration) - dt * f;
                         const elapsed = duration - Math.max(0, top.launchPadTimer);
-
                         const bounceProgress = (elapsed / duration) * 6;
                         let pY = bounceProgress % 2;
                         if (pY > 1) pY = 2 - pY;
-
                         const cy = (top as any).launchPadStartYCenter ?? 540;
                         const y_min = cy - 432; // cy - (540 - 108)
                         const y_max = cy + 432; // cy + (972 - 540)
-
                         const isTL = (top as any).launchPadSourceId === 'pad_bounce_tl';
                         const x_start = isTL ? 560 : 1360;
                         const x_end = isTL ? 1360 : 560;
-
                         top.x = x_start + (elapsed / duration) * (x_end - x_start);
                         if (isTL) {
                             top.y = y_min + pY * (y_max - y_min);
                         } else {
                             top.y = y_max - pY * (y_max - y_min);
                         }
-
                         // Calculate velocities correctly
                         const speedX = ((x_end - x_start) / duration) * f;
                         const speedY = (((y_max - y_min) * 6) / duration) * f;
                         top.vx = speedX;
-
                         const currentBounceIdx = Math.floor(bounceProgress);
                         if (currentBounceIdx % 2 === 0) {
                             top.vy = isTL ? speedY : -speedY;
                         } else {
                             top.vy = isTL ? -speedY : speedY;
                         }
-
                         // Check if a new wall bounce occurred to trigger premium effects
                         const lastB = (top as any).lastBounceIndex ?? -1;
                         if (currentBounceIdx !== lastB && currentBounceIdx >= 0 && currentBounceIdx < 6) {
                             (top as any).lastBounceIndex = currentBounceIdx;
-
                             // Trigger beautiful wall-bounce impact visual elements with reduced/weakened screenshake
                             this.screenShakeTimer = 0.9;
                             this.screenShakeMaxDuration = 0.9;
@@ -2890,7 +2580,6 @@ export class GameEngine {
                             EffectSystem.addParticles(this, top.x, top.y, '#ffffff', 28, 480, 7);
                             EffectSystem.addParticles(this, top.x, top.y, '#22d3ee', 24, 380, 6);
                             EffectSystem.addParticles(this, top.x, top.y, top.color, 28, 420, 7);
-
                             this.shockwaves.push({
                                 x: top.x,
                                 y: top.y,
@@ -2908,18 +2597,14 @@ export class GameEngine {
                         top.launchPadTimer = (top.launchPadTimer ?? duration) - dt * f;
                         const elapsed = duration - Math.max(0, top.launchPadTimer);
                         const flightProgress = elapsed / duration;
-
                         const startX = (top as any).launchPadStartX ?? top.x;
                         const startY = (top as any).launchPadStartY ?? top.y;
                         const endX = top.standbyCenterX ?? startX;
                         const endY = top.standbyCenterY ?? startY;
-
                         const prevX = top.x;
                         const prevY = top.y;
-
                         top.x = startX + (endX - startX) * flightProgress;
                         top.y = startY + (endY - startY) * flightProgress;
-
                         if (dt > 0) {
                             top.vx = (top.x - prevX) / dt;
                             top.vy = (top.y - prevY) / dt;
@@ -2929,19 +2614,15 @@ export class GameEngine {
                         top.launchPadTimer = (top.launchPadTimer ?? duration) - dt * f;
                         const elapsed = duration - Math.max(0, top.launchPadTimer);
                         const flightProgress = elapsed / duration;
-
                         const theta_start = (top as any).launchPadStartAngle ?? 0;
                         const angle = theta_start + flightProgress * Math.PI * 2;
                         const cy = (top as any).launchPadStartYCenter ?? 540;
-
                         top.x = 960 + 865 * Math.cos(angle);
                         top.y = cy + 440 * Math.sin(angle);
-
                         const angleDot = (Math.PI * 2 / duration) * f;
                         top.vx = -865 * Math.sin(angle) * angleDot;
                         top.vy = 440 * Math.cos(angle) * angleDot;
                     }
-
                     if (Math.random() < 0.6) {
                         const originalIdx = parseInt(top.id.split('_')[1], 10);
                         if (!isNaN(originalIdx)) {
@@ -2961,20 +2642,16 @@ export class GameEngine {
                     }
                     EffectSystem.addParticles(this, top.x, top.y, '#06b6d4', 2, 180, 2);
                     EffectSystem.addParticles(this, top.x, top.y, top.color, 2, 150, 3);
-
                     GameUtils.dealLaunchPadSweepDamage(this, top, dt);
-
                     if (top.launchPadTimer <= 0) {
                         if ((top as any).launchPadSource === 'bounce') {
                             (top as any).lastBounceIndex = undefined;
                         }
-
                         if ((top as any).launchPadSource === 'corner_direct') {
                             top.launchPadState = undefined;
                             top.launchPadTimer = undefined;
                             (top as any).launchPadSource = undefined;
                             top.state = 'standby';
-
                             top.vx = 0;
                             top.vy = 0;
                             const matchIdx = top.id.match(/\d+/);
@@ -2991,7 +2668,6 @@ export class GameEngine {
                             top.standbyAngle = Math.random() * Math.PI * 2;
                             top.standbyCenterVx = 0;
                             top.standbyCenterVy = 0;
-
                             this.shockwaves.push({
                                 x: top.x,
                                 y: top.y,
@@ -3007,11 +2683,9 @@ export class GameEngine {
                         } else {
                             top.launchPadState = 'dashing';
                             top.launchPadTimer = 0.45; // shortened 25% from 0.6
-
                             const targetDir = GameUtils.findLaunchPadNearestTargetDir(this, top);
                             (top as any).launchPadDirX = targetDir.x;
                             (top as any).launchPadDirY = targetDir.y;
-
                             this.shockwaves.push({
                                 x: top.x,
                                 y: top.y,
@@ -3030,20 +2704,15 @@ export class GameEngine {
                     top.launchPadTimer = (top.launchPadTimer ?? 0.45) - dt * f;
                     const dirX = (top as any).launchPadDirX ?? 0;
                     const dirY = (top as any).launchPadDirY ?? 0;
-
                     top.state = 'dash';
                     top.dashDirectionX = dirX;
                     top.dashDirectionY = dirY;
-
                     top.vx = dirX * 5200 * f; // sped up by 25% (3900 / 0.75)
                     top.vy = dirY * 5200 * f;
-
                     top.x += top.vx * dt;
                     top.y += top.vy * dt;
-
                     CollisionSystem.handleWallBounce(this, top);
                     GameUtils.clampTopWithinArena(this, top);
-
                     if (Math.random() < 0.8) {
                         const originalIdx = parseInt(top.id.split('_')[1], 10);
                         if (!isNaN(originalIdx)) {
@@ -3063,9 +2732,7 @@ export class GameEngine {
                     }
                     EffectSystem.addParticles(this, top.x, top.y, '#ffffff', 2, 110, 2);
                     EffectSystem.addParticles(this, top.x, top.y, top.color, 3, 220, 3);
-
                     GameUtils.dealLaunchPadSweepDamage(this, top, dt);
-
                     if (top.launchPadTimer <= 0) {
                         top.launchPadState = undefined;
                         top.launchPadBossDamaged = false;
@@ -3077,38 +2744,30 @@ export class GameEngine {
                         top.launchPadSpinCount = undefined;
                         (top as any).multiplayerLaunchStage = undefined;
                         (top as any).multiplayerLaunchPhiStart = undefined;
-
                         // DO NOT reset to full spin automatically upon entering game
                         // top.spin = top.maxSpin || MAX_SPIN; 
-                        
                         top.vx = dirX * 200;
                         top.vy = dirY * 200;
                         top.state = 'standby';
-                        
                         top.standbyAngle = Math.random() * Math.PI * 2;
                         top.standbyCenterX = top.x - Math.cos(top.standbyAngle) * getStandbyRadiusForModel(top, this,  top.standbyAngle);
                         top.standbyCenterY = top.y - Math.sin(top.standbyAngle) * getStandbyRadiusForModel(top, this,  top.standbyAngle);
                     }
                 }
-
                 return;
             }
-
             // Process Model 1 Ultimate Skill timer & movement
             if (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0) {
                 // Keep invulnerable and do not allow standard state updates
                 top.vx = 0;
                 top.vy = 0;
-
                 if (top.skillStartCenter) {
                     if (top.skillDashCount === undefined) {
                         top.skillDashCount = 0;
                         top.skillDashTimer = 0;
                         top.skillDashState = 'pausing'; // start in pausing state to immediately trigger first dash on next frame
                     }
-
                     top.skillDashTimer = Math.max(0, top.skillDashTimer - dt);
-
                     if (top.skillDashTimer <= 0) {
                         if (top.skillDashState === 'dashing') {
                             // Current dash finished! Lock exactly at end coordinates
@@ -3117,11 +2776,9 @@ export class GameEngine {
                                 top.y = top.skillDashEndY;
                                 CollisionSystem.handleWallBounce(this, top);
                             }
-
                             // Create flash explosion at end of dash segment
                             EffectSystem.addParticles(this, top.x, top.y, '#ffffff', 5, 200, 3);
                             EffectSystem.addParticles(this, top.x, top.y, top.color, 8, 250, 4);
-
                             // Transition to pause for tactile feel
                             top.skillDashState = 'pausing';
                             top.skillDashTimer = 0.10; // 100ms pause
@@ -3142,26 +2799,21 @@ export class GameEngine {
                                 top.skillDashCount++;
                                 top.skillDashState = 'dashing';
                                 top.skillDashTimer = 0.15; // 150ms dash travel duration
-
                                 const angle = Math.random() * Math.PI * 2;
                                 const cx = top.skillStartCenter.x;
                                 const cy = top.skillStartCenter.y;
-
                                 const x1 = cx - Math.cos(angle) * 420;
                                 const y1 = cy - Math.sin(angle) * 420;
                                 const x2 = cx + Math.cos(angle) * 420;
                                 const y2 = cy + Math.sin(angle) * 420;
-
                                 top.skillDashStartX = x1;
                                 top.skillDashStartY = y1;
                                 top.skillDashEndX = x2;
                                 top.skillDashEndY = y2;
-
                                 // Teleport instantly to start point
                                 top.x = x1;
                                 top.y = y1;
                                 CollisionSystem.handleWallBounce(this, top);
-
                                 // Add main axis slash line passing exactly through the center from x1,y1 to x2,y2
                                 this.slashLines.push({
                                     x1: x1,
@@ -3173,13 +2825,11 @@ export class GameEngine {
                                     color: top.color,
                                     width: 20
                                 });
-
                                 // Spark blast on start of this strike segment
                                 EffectSystem.addParticles(this, x1, y1, top.color, 5, 100, 2);
                             }
                         }
                     }
-
                     // Perform smooth linear interpolation while dashing to show exact movement process
                     if (top.skillDashState === 'dashing' && 
                         top.skillDashStartX !== undefined && top.skillDashEndX !== undefined &&
@@ -3187,15 +2837,12 @@ export class GameEngine {
                         const duration = 0.15;
                         const elapsed = duration - top.skillDashTimer;
                         const tRatio = Math.min(1, Math.max(0, elapsed / duration));
-
                         top.x = top.skillDashStartX + (top.skillDashEndX - top.skillDashStartX) * tRatio;
                         top.y = top.skillDashStartY + (top.skillDashEndY - top.skillDashStartY) * tRatio;
                         CollisionSystem.handleWallBounce(this, top);
-
                         // Spawn electric trail sparks continuously as the top slides
                         EffectSystem.addParticles(this, top.x, top.y, top.color, 2, 80, 2);
                         EffectSystem.addParticles(this, top.x, top.y, '#ffffff', 1, 100, 1);
-
                         // Add beautiful afterimage trails along the movement process
                         const originalIdx = parseInt(top.id.split('_')[1], 10);
                         if (!isNaN(originalIdx) && Math.random() < 0.4) {
@@ -3214,7 +2861,6 @@ export class GameEngine {
                         }
                     }
                 }
-
                 if (top.skillActiveTimer <= 0) {
                     top.skillActiveTimer = 0;
                     top.state = 'standby';
@@ -3223,10 +2869,8 @@ export class GameEngine {
                     top.standbyCenterX = top.x - Math.cos(top.standbyAngle) * getStandbyRadiusForModel(top, this,  top.standbyAngle);
                     top.standbyCenterY = top.y - Math.sin(top.standbyAngle) * getStandbyRadiusForModel(top, this,  top.standbyAngle);
                 }
-
                 // Maintain ultra spin visualization
                 top.angle += Math.PI * 30 * dt;
-                
                 // Add afterimages periodically
                 if (Math.random() < 0.6) {
                     const originalIdx = parseInt(top.id.split('_')[1], 10);
@@ -3245,12 +2889,10 @@ export class GameEngine {
                         });
                     }
                 }
-                
                 // Process HP loss timers
                 if (top.hpLossTimer !== undefined && top.hpLossTimer > 0) {
                     top.hpLossTimer = Math.max(0, top.hpLossTimer - dt);
                 }
-
                 // ALSO tick the superTimer (Star duration countdown) during Model 1's ultimate skill early return!
                 if (top.superTimer !== undefined && top.superTimer > 0) {
                     top.superTimer = Math.max(0, top.superTimer - dt);
@@ -3260,12 +2902,10 @@ export class GameEngine {
                     }
                 return; // Skip normal movement physics and input bindings below
             }
-
             // Process Model 2 Ultimate Skill (6 orbiting electric balls)
             if (top.model2SkillTimer !== undefined && top.model2SkillTimer > 0) {
                 top.model2SkillTimer = Math.max(0, top.model2SkillTimer - dt);
                 top.model2OrbAngle = (top.model2OrbAngle ?? 0) + 4.5 * dt;
-
                 // Update hit cooldowns
                 if (!top.model2SkillHitCooldowns) {
                     top.model2SkillHitCooldowns = new Map<string, number>();
@@ -3277,7 +2917,6 @@ export class GameEngine {
                         top.model2SkillHitCooldowns.delete(targetId);
                     }
                 }
-
                 // Determine orb positions (6 orbs around the gyro)
                 const orbitRadius = 135;
                 const orbRadius = 28;
@@ -3285,12 +2924,10 @@ export class GameEngine {
                 for (let i = 0; i < 6; i++) {
                     angles.push((top.model2OrbAngle ?? 0) + (i * Math.PI / 3));
                 }
-
                 const orbPositions = angles.map(ang => ({
                     x: top.x + Math.cos(ang) * orbitRadius,
                     y: top.y + Math.sin(ang) * orbitRadius
                 }));
-
                 // Calculate fade-in and fade-out alpha factor
                 let orbAlpha = 1.0;
                 if (top.model2SkillTimer > 9.0) {
@@ -3298,7 +2935,6 @@ export class GameEngine {
                 } else if (top.model2SkillTimer < 0.6) {
                     orbAlpha = Math.max(0, Math.min(1.0, top.model2SkillTimer / 0.6));
                 }
-
                 // Spawn micro sparks/flares from the orbiting balls in real time
                 orbPositions.forEach(pos => {
                     if (Math.random() < 0.25 * orbAlpha) {
@@ -3307,11 +2943,9 @@ export class GameEngine {
                         EffectSystem.addParticles(this, pos.x, pos.y, col, 1, 80, 2);
                     }
                 });
-
                 // Collision with Zombies
                 this.zombies.forEach(z => {
                     if (z.markForDeletion || z.hp <= 0 || (z as any).isSiegeZombie) return;
-
                     let collides = false;
                     for (const pos of orbPositions) {
                         const zRadius = z.type === 'zombie_boss' ? 70 : ((z.type === 'zombie_big' || z.type === 'zombie_bomb' || z.type === 'zombie_bouncing') ? 38 : 18);
@@ -3321,19 +2955,16 @@ export class GameEngine {
                             break;
                         }
                     }
-
                     if (collides) {
                         const currentCd = top.model2SkillHitCooldowns!.get(z.id) ?? 0;
                         if (currentCd <= 0) {
                             // Damage: 1.0 per hit
                             GameUtils.applyDamageToZombie(this, z, 1, top.id);
                             top.model2SkillHitCooldowns!.set(z.id, 0.5); // 0.5 seconds hit cooldown
-
                             z.flashTimer = 0.15;
                             // Add electric visual splash
                             EffectSystem.addParticles(this, z.x, z.y, '#eab308', 3, 110, 3);
                             EffectSystem.addParticles(this, z.x, z.y, '#38bdf8', 2, 130, 2);
-
                             if (z.hp <= 0) {
                                 const isAlreadyDying = (z as any).isDying;
                                 if (!isAlreadyDying) {
@@ -3342,7 +2973,6 @@ export class GameEngine {
                                     const playerIdx = matchIdx ? parseInt(matchIdx[0], 10) : 0;
                                     this.spawnTicket(z.x, z.y, z.type, playerIdx);
                                     top.kills = (top.kills ?? 0) + 1;
-
                                     // Small flashy energy wave
                                     this.shockwaves.push({
                                         x: z.x,
@@ -3362,11 +2992,9 @@ export class GameEngine {
                         }
                     }
                 });
-
                 // Collision with other tops (Versus Mode)
                 this.tops.forEach(other => {
                     if (other.id === top.id || other.markForDeletion || other.isExploding || other.hp <= 0) return;
-
                     let collides = false;
                     for (const pos of orbPositions) {
                         const dist = Math.hypot(other.x - pos.x, other.y - pos.y);
@@ -3375,7 +3003,6 @@ export class GameEngine {
                             break;
                         }
                     }
-
                     if (collides) {
                         const currentCd = top.model2SkillHitCooldowns!.get(other.id) ?? 0;
                         if (currentCd <= 0 && (other.hitCooldown === undefined || other.hitCooldown <= 0)) {
@@ -3385,9 +3012,7 @@ export class GameEngine {
                                 other.hitCooldown = 1.0; // 1-second invulnerability protection
                             }
                             top.model2SkillHitCooldowns!.set(other.id, 0.5); // 0.5s cooldown
-
                             EffectSystem.addParticles(this, other.x, other.y, '#38bdf8', 3, 120, 3);
-
                             const dx = other.x - top.x;
                             const dy = other.y - top.y;
                             const len = Math.hypot(dx, dy);
@@ -3399,12 +3024,10 @@ export class GameEngine {
                     }
                 });
             }
-
             // Process Model 3 Ultimate Skill (Gigantification)
             if (top.model3SkillTimer !== undefined && top.model3SkillTimer > 0) {
                 top.model3SkillTimer = Math.max(0, top.model3SkillTimer - dt);
             }
-
             // Process coop state
             if (top.coopState) {
                 EventSystem.updateCoopState(this, top, dt);
@@ -3417,22 +3040,18 @@ export class GameEngine {
                 }
             } else if (top.deadlockTimer !== undefined && top.deadlockTimer > 0) {
                 top.deadlockTimer = Math.max(0, top.deadlockTimer - dt);
-
                 // Vibration: "僵持時兩顆陀螺本身要有震動。"
                 const vibeForce = 24.0;
                 top.deadlockVibeX = (Math.random() - 0.5) * vibeForce;
                 top.deadlockVibeY = (Math.random() - 0.5) * vibeForce;
-
                 // Stop all other movement forces
                 top.vx = 0;
                 top.vy = 0;
                 top.standbyCenterVx = 0;
                 top.standbyCenterVy = 0;
-
                 // Lock layout position with high intensity vibration
                 top.x = (top.deadlockX ?? top.x) + top.deadlockVibeX;
                 top.y = (top.deadlockY ?? top.y) + top.deadlockVibeY;
-
                 // Continuous sparks at standoff touch contacts
                 if (top.deadlockPartnerId) {
                     const partner = this.tops.find(t => t.id === top.deadlockPartnerId) || 
@@ -3440,7 +3059,6 @@ export class GameEngine {
                     if (partner && top.id < partner.id) {
                         const midX = (top.x + partner.x) / 2;
                         const midY = (top.y + partner.y) / 2;
-                        
                         // Standard warning/impact sparks
                         if (Math.random() < 0.4) {
                             EffectSystem.addParticles(this, midX, midY, '#eab308', 2, 100, 4); // Yellow
@@ -3448,7 +3066,6 @@ export class GameEngine {
                         if (Math.random() < 0.3) {
                             EffectSystem.addParticles(this, midX, midY, '#f97316', 2, 120, 5); // Orange
                         }
-
                         // 4.陀螺互撞僵持時，兩顆陀螺的接觸點要有額外的電流擴散粒子噴出。
                         const electricCount = Math.floor(Math.random() * 3) + 2; // Spawns 2 to 4 electric branches per frame
                         for (let k = 0; k < electricCount; k++) {
@@ -3469,39 +3086,31 @@ export class GameEngine {
                         }
                     }
                 }
-
                 // Check for termination of deadlock
                 if (top.deadlockTimer <= 0) {
                     // Trigger separation and screen shake: "僵持結束兩顆陀螺交錯離開時要有畫面震動效果。"
                     this.screenShakeTimer = 0.9;
                     this.screenShakeMaxDuration = 0.9;
                     this.screenShakeIntensity = 12;
-
                     const dX_self = top.deadlockX ?? top.x;
                     const dY_self = top.deadlockY ?? top.y;
-
                     if (top.deadlockPartnerId) {
                         const partnerTopsNode = this.tops.find(t => t.id === top.deadlockPartnerId);
                         const partnerZombiesNode = this.zombies.find(z => z.id === top.deadlockPartnerId);
-
                         if (partnerTopsNode) {
                             const partner = partnerTopsNode;
                             const dX_partner = partner.deadlockX ?? partner.x;
                             const dY_partner = partner.deadlockY ?? partner.y;
-
                             const dx = dX_self - dX_partner;
                             const dy = dY_self - dY_partner;
                             const dist = Math.hypot(dx, dy) || 1;
                             const nx = dx / dist;
                             const ny = dy / dist;
-
                             // Perpendicular swerve vector and repelling vector: "然後大幅度偏移交錯而過。注意這個是偏移而不是整顆陀螺反彈往不同方向。"
                             const tx = -ny;
                             const ty = nx;
-
                             const swervePower = 650;
                             const repelPower = 400;
-
                             // Swerve past and repel away
                             top.deflectionVx = (nx * repelPower + tx * swervePower) * 2;
                             top.deflectionVy = (ny * repelPower + ty * swervePower) * 2;
@@ -3509,36 +3118,30 @@ export class GameEngine {
                             top.deflectionY = (ny * 30 + ty * 45) * 2;
                             top.bounceTimer = 0.4;
                             top.maxBounceTimer = 0.4;
-
                             partner.deflectionVx = (-nx * repelPower - tx * swervePower) * 2;
                             partner.deflectionVy = (-ny * repelPower - ty * swervePower) * 2;
                             partner.deflectionX = (-nx * 30 - tx * 45) * 2;
                             partner.deflectionY = (-ny * 30 - ty * 45) * 2;
                             partner.bounceTimer = 0.4;
                             partner.maxBounceTimer = 0.4;
-
                             // Re-align orbit parameters so orbital motion resumes smoothly from the standoff lock location
                             const velAngleSelf = Math.atan2(top.deflectionVy, top.deflectionVx);
                             top.standbyAngle = velAngleSelf;
                             const r_std_self = getStandbyRadiusForModel(top, this,  top.standbyAngle);
                             top.standbyCenterX = dX_self - Math.cos(top.standbyAngle) * r_std_self;
                             top.standbyCenterY = dY_self - Math.sin(top.standbyAngle) * r_std_self;
-
                             const velAnglePartner = Math.atan2(partner.deflectionVy, partner.deflectionVx);
                             partner.standbyAngle = velAnglePartner;
                             const r_std_partner = getStandbyRadiusForModel(partner, this,  partner.standbyAngle);
                             partner.standbyCenterX = dX_partner - Math.cos(partner.standbyAngle) * r_std_partner;
                             partner.standbyCenterY = dY_partner - Math.sin(partner.standbyAngle) * r_std_partner;
-
                             // Spawn high density explosion particles at Separation contact midpoint
                             const midX = (dX_self + dX_partner) / 2;
                             const midY = (dY_self + dY_partner) / 2;
                             EffectSystem.addParticles(this, midX, midY, '#fbbf24', 35, 250, 10);
                             EffectSystem.addParticles(this, midX, midY, '#ef4444', 20, 200, 8);
-
                             // Set 1-second cooldown after a top releases from a deadlock standoff
                             partner.deadlockCooldownTimer = 1.0;
-
                             // Clean partner deadlock statuses
                             partner.deadlockTimer = 0;
                             partner.deadlockPartnerId = undefined;
@@ -3550,39 +3153,32 @@ export class GameEngine {
                             const partner = partnerZombiesNode;
                             const dX_partner = partner.deadlockX ?? partner.x;
                             const dY_partner = partner.deadlockY ?? partner.y;
-
                             const dx = dX_self - dX_partner;
                             const dy = dY_self - dY_partner;
                             const dist = Math.hypot(dx, dy) || 1;
                             const nx = dx / dist;
                             const ny = dy / dist;
-
                             // "當玩家陀螺衝撞魔王時，也要觸發同陀螺僵持做法的僵持行為，但僵持結束後，魔王不會有錯身而過的行為。"
                             // Swerve the player top past and repel away
                             const tx = -ny;
                             const ty = nx;
-
                             const swervePower = 650;
                             const repelPower = 400;
-
                             top.deflectionVx = (nx * repelPower + tx * swervePower) * 2;
                             top.deflectionVy = (ny * repelPower + ty * swervePower) * 2;
                             top.deflectionX = (nx * 30 + tx * 45) * 2;
                             top.deflectionY = (ny * 30 + ty * 45) * 2;
-
                             // Re-align orbit parameters so orbital motion resumes smoothly from the standoff lock location
                             const velAngleSelf = Math.atan2(top.deflectionVy, top.deflectionVx);
                             top.standbyAngle = velAngleSelf;
                             const r_std_self = getStandbyRadiusForModel(top, this,  top.standbyAngle);
                             top.standbyCenterX = dX_self - Math.cos(top.standbyAngle) * r_std_self;
                             top.standbyCenterY = dY_self - Math.sin(top.standbyAngle) * r_std_self;
-
                             // Spawn high density explosion particles at Separation contact midpoint
                             const midX = (dX_self + dX_partner) / 2;
                             const midY = (dY_self + dY_partner) / 2;
                             EffectSystem.addParticles(this, midX, midY, '#fbbf24', 35, 250, 10);
                             EffectSystem.addParticles(this, midX, midY, '#ef4444', 20, 200, 8);
-
                             // Clean partner (boss) deadlock statuses
                             partner.deadlockTimer = 0;
                             partner.deadlockPartnerId = undefined;
@@ -3592,10 +3188,8 @@ export class GameEngine {
                             partner.deadlockVibeY = 0;
                         }
                     }
-
                     // Set 1-second cooldown for self
                     top.deadlockCooldownTimer = 1.0;
-
                     // Clean own deadlock statuses
                     top.deadlockTimer = 0;
                     top.deadlockPartnerId = undefined;
@@ -3604,33 +3198,25 @@ export class GameEngine {
                     top.deadlockVibeX = 0;
                     top.deadlockVibeY = 0;
                 }
-
                 // Skip all other standard update forces
                 return;
             }
-
             // Calculate and decay physical deflection offset to simulate brushing past obstacles elegantly
             const prevDefX = top.deflectionX ?? 0;
             const prevDefY = top.deflectionY ?? 0;
-
             top.deflectionVx = top.deflectionVx ?? 0;
             top.deflectionVy = top.deflectionVy ?? 0;
             top.deflectionX = top.deflectionX ?? 0;
             top.deflectionY = top.deflectionY ?? 0;
-
             // Decay deflection velocity & displacement
             top.deflectionVx *= Math.exp(-7.5 * dt);
             top.deflectionVy *= Math.exp(-7.5 * dt);
-
             top.deflectionX += top.deflectionVx * dt;
             top.deflectionY += top.deflectionVy * dt;
-
             top.deflectionX *= Math.exp(-7.5 * dt);
             top.deflectionY *= Math.exp(-7.5 * dt);
-
             const dDefX = top.deflectionX - prevDefX;
             const dDefY = top.deflectionY - prevDefY;
-
             // Shift orbital center to new deflected position permanently instead of snapping back to the old orbit
             if (!top.state || top.state === 'standby') {
                 if (top.standbyCenterX !== undefined) {
@@ -3640,7 +3226,6 @@ export class GameEngine {
                     top.standbyCenterY -= dDefY;
                 }
             }
-
             // HP animation logic for fighting game style catch-up bar and shock effects
             if (top.prevHp === undefined) {
                 top.prevHp = top.hp;
@@ -3648,7 +3233,6 @@ export class GameEngine {
                 top.hpLossTimer = 0;
                 top.damageShockTimer = 0;
             }
-
             if (top.hp < top.prevHp) {
                 // Top took damage! Trigger effects
                 top.damageShockTimer = 0.45; // 450ms flash/shake duration
@@ -3656,7 +3240,6 @@ export class GameEngine {
                 top.maxBounceTimer = 0.35;
                 top.hpLossTimer = 0.5;       // 500ms delay before catch-up bar drains
                 top.prevHp = top.hp;
-
                 if (top.hp <= 0) {
                     SoundSystem.play('SE-Hurt1');
                     SoundSystem.play('SE-Dizzy1');
@@ -3668,7 +3251,6 @@ export class GameEngine {
                     (top as any).deathTimestamp = Date.now();
                     (top as any).deathExplosionCount = 3;
                     (top as any).deathExplosionTimer = 0.0;
-                    
                     // Clear lingering timers
                     top.dashTrailTimer = 0;
                     top.breakoutOrbitTimer = 0;
@@ -3684,16 +3266,13 @@ export class GameEngine {
                     (top as any).isSpinningFromAI = false;
                     top.introOrbitTime = undefined;
                     (top as any).introShake = 0;
-                    
                     // Immediately remove lingering afterimages for this top
                     this.afterimages = this.afterimages.filter(img => img.ownerId !== top.id);
                     this.phantomClones = this.phantomClones.filter(pc => pc.ownerId !== top.id);
                 }
-                
                 // Add global screen shake if the damaged top is a player (disabled per user request)
                 if (!top.isAI) {
                     // this.screenShakeTimer = 0.8;
-                    
                     // Spray out a glowing burst of fiery spark particles!
                     const colors = ['#ffffff', '#fde047', '#fde047', '#f97316', '#ef4444'];
                     const sparkCount = 45;
@@ -3702,7 +3281,6 @@ export class GameEngine {
                         const speed = 180 + Math.random() * 420; // explosive burst speeds
                         const size = Math.random() * 3.5 + 2.0;   // nice streak width
                         const maxLife = 0.35 + Math.random() * 0.45; // brief, bright lifespan
-                        
                         this.particles.push({
                             x: top.x,
                             y: top.y,
@@ -3721,7 +3299,6 @@ export class GameEngine {
                 top.visualHp = top.hp;
                 top.prevHp = top.hp;
             }
-
             // Universal Spin Reduction Trigger for hit knockback response (受擊擊退反應)
             if (top.damageShockTimer !== undefined && top.damageShockTimer > 0) {
                 if (!(top as any).wasInDamageShock) {
@@ -3741,7 +3318,6 @@ export class GameEngine {
             } else {
                 (top as any).wasInDamageShock = false;
             }
-
             // Decrement timers
             if (top.damageShockTimer !== undefined && top.damageShockTimer > 0) {
                 top.damageShockTimer = Math.max(0, top.damageShockTimer - dt);
@@ -3760,29 +3336,23 @@ export class GameEngine {
                     top.visualHp = top.hp;
                 }
             }
-
             // Update Flash Timer
             if (top.flashTimer !== undefined && top.flashTimer > 0) {
                 top.flashTimer = Math.max(0, top.flashTimer - dt);
             }
-            
             GameUtils.tickMissions(this, top, dt);
-
             // Update Hit Cooldown
             if (top.hitCooldown !== undefined && top.hitCooldown > 0) {
                 top.hitCooldown = Math.max(0, top.hitCooldown - dt);
             }
-
             // Update Struggle Triumph Timer
             if (top.struggleTriumphTimer !== undefined && top.struggleTriumphTimer > 0) {
                 top.struggleTriumphTimer = Math.max(0, top.struggleTriumphTimer - dt);
             }
-
             // Update Small Zombie Hit Cooldown
             if (top.smallZombieHitCooldown !== undefined && top.smallZombieHitCooldown > 0) {
                 top.smallZombieHitCooldown = Math.max(0, top.smallZombieHitCooldown - dt);
             }
-
             if ((top as any).isDeadState) {
                 top.vx *= 0.85;
                 top.vy *= 0.85;
@@ -3790,54 +3360,44 @@ export class GameEngine {
                 top.y += top.vy * dt + dDefY;
                 top.angle += Math.PI * 1.5 * dt; // Keep spinning slowly
                 CollisionSystem.handleWallBounce(this, top);
-
                 // Handle staggered death explosions on top of the dead player's body
                 if ((top as any).deathExplosionCount !== undefined && (top as any).deathExplosionCount > 0) {
                     (top as any).deathExplosionTimer = ((top as any).deathExplosionTimer ?? 0) - dt;
                     if ((top as any).deathExplosionTimer <= 0) {
                         (top as any).deathExplosionCount--;
                         (top as any).deathExplosionTimer = 0.2 + Math.random() * 0.15; // 200ms to 350ms interval
-                        
                         const offsetX = (Math.random() - 0.5) * 32;
                         const offsetY = (Math.random() - 0.5) * 32;
                         EffectSystem.spawnSkillKillExplosion(this, top.x + offsetX, top.y + offsetY, false);
-                        
                         SoundSystem.play('SE-Explo1');
                     }
                 }
                 return; // Bypass standard updates
             }
-
             if (top.isExploding) {
                 top.explosionTimer = (top.explosionTimer ?? 2.0) - dt;
-                
                 // Slow down the exploding top physically
                 top.vx *= 0.85;
                 top.vy *= 0.85;
                 top.x += top.vx * dt + dDefX;
                 top.y += top.vy * dt + dDefY;
-                
                 // Continuous sparkles during explosion
                 if (Math.random() < 0.4) {
                     EffectSystem.addParticles(this, top.x + (Math.random() - 0.5) * 16, top.y + (Math.random() - 0.5) * 16, top.color, 5, 200, 8);
                 }
-                
                 // Wall bounce still applies so it doesn't slide out of bounds
                 CollisionSystem.handleWallBounce(this, top);
-                
                 if (top.explosionTimer <= 0) {
                     top.markForDeletion = true;
                 }
                 return; // Bypass standard updates
             }
-
             // Prevent movement and skills if immobilized by zombie siege clinging
             if (this.zombieSiegeActive && this.siegeStatus === 'clinging' && top.id === this.siegeTargetPlayerId) {
                 top.vx = 0;
                 top.vy = 0;
                 top.standbyCenterVx = 0;
                 top.standbyCenterVy = 0;
-                
                 if (top.hitCooldown !== undefined && top.hitCooldown > 0) {
                     top.hitCooldown = Math.max(0, top.hitCooldown - dt);
                 }
@@ -3849,7 +3409,6 @@ export class GameEngine {
                 }
                 return;
             }
-
             // Check super state timer and progress
             if (top.superTimer !== undefined && top.superTimer > 0) {
                 top.superTimer = Math.max(0, top.superTimer - dt);
@@ -3857,7 +3416,6 @@ export class GameEngine {
                 if (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) {
                                 top.rainbowSuperTimer = Math.max(0, top.rainbowSuperTimer - dt);
                 }
-
             // Check if user is currently pressing/holding spin button
             let isSpinning = false;
             if (this.versusEndActive || top.hp <= 0) {
@@ -3884,7 +3442,6 @@ export class GameEngine {
             } else if (top.isAI) {
                 isSpinning = (top as any).isSpinningFromAI ?? false;
             }
-
                         // Initialize or update spinIdleTime
             if (top.spinIdleTime === undefined) {
                 top.spinIdleTime = 0;
@@ -3894,11 +3451,9 @@ export class GameEngine {
             } else {
                 top.spinIdleTime += dt;
             }
-
             // Continuous spin increase when holding for players (increases by 300 spin points = 3.0 grids per second)
             if (!top.isAI && isSpinning) {
                 // Long-press continuous spin increase is disabled. Players must tap/mash to increase spin.
-
                 let isDirectionInputActive = false;
                 if (top.controls) {
                     if (this.keys.has(top.controls.up) ||
@@ -3908,12 +3463,10 @@ export class GameEngine {
                         isDirectionInputActive = true;
                     }
                 }
-
                 if (isDirectionInputActive) {
                     top.contractRings = [];
                 }
             }
-
             // Remove automatic decay over time. Spin now does not decrease automatically.
             // But we still maintain the absolute minimum of 1 grid (100 spin points) if alive
             if (top.hp > 0) {
@@ -3921,19 +3474,15 @@ export class GameEngine {
             } else {
                 top.spin = 10;
             }
-
             // Auto-recovery has been disabled per user request
             const displayedSpinGrids = Math.max(1, Math.min(10, Math.floor(top.spin / top.maxSpin * 10)));
             top.lastDisplayedSpinGrids = displayedSpinGrids;
-
             // Fixed at maximum spin under Super State
             if (top.superTimer !== undefined && top.superTimer > 0) {
                 top.spin = MAX_SPIN;
             }
-
             // Store isSpinning state for other systems
             top.isSpinning = isSpinning;
-
             // Initialize and age axisTrail list
             if (!top.axisTrail) {
                 top.axisTrail = [];
@@ -3942,12 +3491,10 @@ export class GameEngine {
                 p.life -= dt;
             });
             top.axisTrail = top.axisTrail.filter(p => p.life > 0);
-
             // 只有陀螺衝鋒或持續控制移動時，才要生成拖尾電流。同時依舊需要符合轉速大於5 (isHighSpin > 5)。
             const isHighSpin = (top.spin / (top.maxSpin || MAX_SPIN) * 10) > 5;
             const isDashing = top.state === 'dash' || !!top.isActivelyPushing;
             const shouldGetElectricTrail = isHighSpin && isDashing && top.hp > 0;
-
             if (shouldGetElectricTrail) {
                 // 寫入全新的衝刺軌軌點 (生命週期設為 0.525秒 增強殘影感)
                 top.axisTrail.push({
@@ -3956,11 +3503,9 @@ export class GameEngine {
                     life: 0.525,
                     isDash: true // 此旗標用於觸發後續繪圖的閃電渲染
                 });
-
                 if (top.axisTrail.length > 80) {
                     top.axisTrail.shift();
                 }
-
                 // 向後方（阻力/拖曳方向）高機率噴散高速電光微粒 (生成密度減半: 0.9 -> 0.45)
                 if (Math.random() < 0.45) {
                     const topSpeed = Math.hypot(top.vx, top.vy);
@@ -3984,11 +3529,9 @@ export class GameEngine {
                     }
                     const bX = - dirX * 110 * (0.5 + Math.random() * 0.5);
                     const bY = - dirY * 110 * (0.5 + Math.random() * 0.5);
-                    
                     const cols = ['#ffffff', '#60a5fa', '#38bdf8', top.color];
                     const col = cols[Math.floor(Math.random() * cols.length)];
                     const size = Math.random() * 6 + 4;
-                    
                     this.particles.push({
                         x: top.x,
                         y: top.y,
@@ -4016,7 +3559,6 @@ export class GameEngine {
                     }
                 }
             }
-
             // Update smooth spin boost factor
             if (top.spinBoostFactor === undefined) top.spinBoostFactor = 0;
             if (isSpinning) {
@@ -4024,7 +3566,6 @@ export class GameEngine {
             } else {
                 top.spinBoostFactor = Math.max(0, top.spinBoostFactor - dt * 2.5);
             }
-            
             // Visual rotation speed based on spin - ensuring it doesn't look static even at low spin (halved the minimum speed)
             // Reduced maximum and minimum spin speeds by 30% for a smoother visual feel (scaling coefficient with 0.7)
             // Increased the visual speed difference between low and high RPM per user request
@@ -4032,7 +3573,6 @@ export class GameEngine {
             const visualSpinFactor = top.spin > 0 ? (0.05 + 0.95 * spinPct) : 0;
             // When user is holding standard spinning/accelerating control, spin rotation speed boosts significantly mapping to intensive spin visual mode - Increased by 30% per user request
             const spinningMultiplier = isSpinning ? 3.0 : 1.0;
-            
             // Calculate a dramatic spin boost factor when preparing and charging in the launch/catapult area
             let catapultSpinMultiplier = 1.0;
             if (top.launchPadState === 'prep_spinning') {
@@ -4043,19 +3583,15 @@ export class GameEngine {
             } else if (top.launchPadState === 'charging') {
                 catapultSpinMultiplier = 7.0; // peak spin rate during charge before flight
             }
-            
             top.angle += visualSpinFactor * Math.PI * 18 * dt * 0.7 * spinningMultiplier * 1.3 * catapultSpinMultiplier;
-
             // Update Dash Cooldown
             if (top.dashCooldown > 0) {
                 top.dashCooldown = Math.max(0, top.dashCooldown - dt);
             }
-            
             // Fixed at 0 (instant recharge) under Super State
             if (top.superTimer !== undefined && top.superTimer > 0) {
                 top.dashCooldown = 0;
             }
-
             // Track player's direction keys hold duration for long-press subsequent dash
             if (!top.isAI && top.controls && top.hp > 0) {
                 const isClinging = (this.zombieSiegeActive && (this.siegeStatus === 'clinging' || this.siegeStatus === 'resolved_success') && top.id === this.siegeTargetPlayerId) || top.launchPadState !== undefined || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0) || this.transitionState === 'buffer';
@@ -4067,32 +3603,27 @@ export class GameEngine {
                     if (this.keys.has(top.controls.left)) dx -= 1;
                     if (this.keys.has(top.controls.right)) dx += 1;
                 }
-
                 const isAnyDirPressed = (dx !== 0 || dy !== 0);
                 if (isAnyDirPressed) {
                     top.dirKeyPressDuration = (top.dirKeyPressDuration ?? 0) + dt;
                 } else {
                     top.dirKeyPressDuration = 0;
                 }
-
                 // If in standby, or if already in dash state and has been dashing for at least 0.5s, and held for more than 0.35s (維持長壓), execute subsequent dash
                 const currentSpinVal = top.spin ?? 0;
                 const canDash = (currentSpinVal >= 0) || (((top.superTimer !== undefined && top.superTimer > 0) || (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0)));
                 const inStandby = !top.state || top.state === 'standby';
                 const isDashingLongEnough = top.state === 'dash' && (((top.maxDashDuration ?? 0) - (top.dashTimer ?? 0)) >= 0.5);
                 const allowedState = inStandby || isDashingLongEnough;
-
                 if (false && canDash && allowedState && ((top.dirKeyPressDuration ?? 0) >= 0.35)) {
                     if (isAnyDirPressed && !this.versusEndActive) {
                         const length = Math.hypot(dx, dy);
                         const ndx = dx / length;
                         const ndy = dy / length;
-
                         // Consume 1 grid of spin if not in super state!
                         if (!(((top.superTimer !== undefined && top.superTimer > 0) || (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0)))) {
                             top.spin = Math.max(100, top.spin - 100);
                         }
-
                         // Transition player to "dash" state
                         top.state = 'dash';
                         top.dashInputHistory = [];
@@ -4115,21 +3646,17 @@ export class GameEngine {
                         top.vy = ndy * baseLaunchSpeed;
                         top.dashCooldown = 0;
                         top.maxDashCooldown = 0;
-
                         top.dashCount = (top.dashCount ?? 0) + 1;
                         // Emit beautiful deep purple dash burst energy sparks to visualize subsequent consecutive dash activation!
                         EffectSystem.addPurpleDashParticles(this, top.x, top.y, 12, 5);
-                        
                         // Initialize dash trails for beautiful afterimages
                         top.dashTrailTimer = Math.max(0.1, scaledDuration - 0.1); 
                         top.nextTrailSpawn = 0;
-
                         // Reset press duration on triggering a dash, so they must hold for another 0.35s for the next subsequent dash
                         top.dirKeyPressDuration = 0;
                     }
                 }
             }
-
             // Update Dash Pending Timer for responsive 8-direction detection
             if (top.dashPendingTimer !== undefined && top.dashPendingTimer > 0) {
                 top.dashPendingTimer -= dt;
@@ -4143,24 +3670,19 @@ export class GameEngine {
                         if (this.keys.has(top.controls.down)) dy += 1;
                         if (this.keys.has(top.controls.left)) dx -= 1;
                         if (this.keys.has(top.controls.right)) dx += 1;
-
                         if (dx !== 0 || dy !== 0) {
                             const length = Math.hypot(dx, dy);
                             const ndx = dx / length;
                             const ndy = dy / length;
-
                             // Determine if this is a subsequent dash inside the dash state
                             const isSubsequentDash = (top.state === 'dash');
-
                             if (top.spin < 0 && !(((top.superTimer !== undefined && top.superTimer > 0) || (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0)))) {
                                 return; // Not enough spin to dash!
                             }
-
                             // Consume 1 grid of spin!
                             if (!(((top.superTimer !== undefined && top.superTimer > 0) || (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0)))) {
                                 top.spin = Math.max(100, top.spin - 100);
                             }
-
                             // Transition player to "dash" state
                             top.state = 'dash';
                             top.dashInputHistory = [];
@@ -4184,7 +3706,6 @@ export class GameEngine {
                             top.vy = ndy * baseLaunchSpeed;
                             top.dashCooldown = 0;
                             top.maxDashCooldown = 0;
-
                             if (isSubsequentDash) {
                                 top.dashCount = (top.dashCount ?? 0) + 1;
                                 // Emit beautiful deep purple dash burst energy sparks to visualize subsequent consecutive dash activation!
@@ -4192,7 +3713,6 @@ export class GameEngine {
                             } else {
                                 top.dashCount = 1;
                             }
-                            
                             // Initialize dash trails for beautiful afterimages
                             top.dashTrailTimer = Math.max(0.1, scaledDuration - 0.1); // Extended to match longer dash duration
                             top.nextTrailSpawn = 0;
@@ -4200,12 +3720,10 @@ export class GameEngine {
                     }
                 }
             }
-
             // Dash & spin boost trails / afterimages spawner
             if (top.dashTrailTimer !== undefined && top.dashTrailTimer > 0) {
                 top.dashTrailTimer = Math.max(0, top.dashTrailTimer - dt);
             }
-            
             const isBreakoutOrbit = (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
             const shouldSpawnTrail = ((top.dashTrailTimer !== undefined && top.dashTrailTimer > 0) || isSpinning || isBreakoutOrbit) && top.hp > 0;
             if (shouldSpawnTrail) {
@@ -4232,7 +3750,6 @@ export class GameEngine {
                     }
                 }
             }
-
             // AI Cooldown AI Movement - Privilege impulsive dash has been fully disabled under Option A.
             // AI now chases objects gracefully purely via direction pushing inputs (just like human player keys).
             if (top.isAI && top.hp > 0 && top.spin > 0) {
@@ -4242,7 +3759,6 @@ export class GameEngine {
                     EffectSystem.addParticles(this, top.x, top.y, top.color, 5, 5);
                 }
             }
-
             // Physics Update (Tops state machine)
             if (top.hp > 0 && top.spin > 0) {
                 if (!top.state || top.state === 'standby') {
@@ -4268,7 +3784,6 @@ export class GameEngine {
                             }
                             let dx = top.dashDirectionX ?? 0;
                             let dy = top.dashDirectionY ?? 0;
-
                             // Apply inertia drift: always use the exact drift time (0.39s) and speed profiles corresponding to spin speed 3
                             // This ensures that regardless of initial spin state or total dash duration, the drift amplitude is completely uniform.
                             const driftDuration = 0.39;
@@ -4278,17 +3793,14 @@ export class GameEngine {
                                 }
                                 const driftSide = (top as any).dashDriftSide;
                                 const driftProgress = (driftDuration - (top.dashTimer ?? 0)) / driftDuration; // smoothly goes from 0 to 1 over exactly 0.39 seconds
-                                
                                 // Dynamic spiral/rotational curl. theta reaches up to 1.6 * PI (a perfect drift loop)
                                 const driftAngle = driftSide * Math.sin(driftProgress * Math.PI * 0.5) * Math.PI * 1.6;
                                 const cosA = Math.cos(driftAngle);
                                 const sinA = Math.sin(driftAngle);
-                                
                                 const rDx = dx * cosA - dy * sinA;
                                 const rDy = dx * sinA + dy * cosA;
                                 dx = rDx;
                                 dy = rDy;
-
                                 // Implement a dynamic acceleration/deceleration speed wave over the drift progress.
                                 // It decelerates rapidly as it breaks into the drift turn, reaches a low-speed curve peak,
                                 // and then surges/whips forward as it snaps out of the drift loop for a smooth natural finish!
@@ -4303,7 +3815,6 @@ export class GameEngine {
                                     speedMultiplier = 0.52 + 0.83 * Math.pow(t, 1.4);
                                 }
                                 dashSpeed = 820 * speedMultiplier * 1.3 * 1.5;
-
                                 // Spawn gold friction sparks to emphasize ground contact of drifting
                                 if (Math.random() < 0.35) {
                                     EffectSystem.addParticles(this, 
@@ -4318,10 +3829,8 @@ export class GameEngine {
                             } else {
                                 (top as any).dashDriftSide = undefined;
                             }
-
                             top.vx = dx * dashSpeed;
                             top.vy = dy * dashSpeed;
-
                             // Apply position increment directly
                             top.x += top.vx * dt + dDefX;
                             top.y += top.vy * dt + dDefY;
@@ -4334,16 +3843,13 @@ export class GameEngine {
                 top.x += top.vx * dt + dDefX;
                 top.y += top.vy * dt + dDefY;
             }
-            
             // Wall bounce
             CollisionSystem.handleWallBounce(this, top);
-            
             // Z-axis physics (Flinging / Parabola)
             if ((top.zPos !== undefined && top.zPos > 0) || (top.zVel !== undefined && top.zVel > 0)) {
                 if (top.zPos === undefined) top.zPos = 0;
                 top.zPos += (top.zVel || 0) * dt;
                 top.zVel = (top.zVel || 0) - 2500 * dt; // Gravity
-                
                 if (top.zPos <= 0) {
                     top.zPos = 0;
                     top.zVel = 0;
@@ -4363,24 +3869,19 @@ export class GameEngine {
                     this.screenShakeIntensity = 10;
                 }
             }
-
             // Death state has been disabled per user request
         });
-        
         // ─── 核心強化氣旋判定範圍（傷害1點） ───
         this.tops.forEach(top => {
             // 轉速 5 格以上（top.spin >= 500）且處於 standby 繞行狀態並正在旋轉
             // 依用戶要求：繞行狀態下的陀螺本身不再具備額外擴展範圍的氣旋攻擊判定
             const isEnhanced = false;
             if (!isEnhanced) return;
-
             // 圓形攻擊判定半徑等同強力氣旋特效的半徑大小 (top.radius + 100 像素)
             const cycloneRadius = top.radius + 80;
-
             // 1. 判定對殭屍的範圍攻擊
             this.zombies.forEach(z => {
                 if (z.markForDeletion || z.hp <= 0 || (z as any).isSiegeZombie) return;
-
                 const dist = Math.hypot(z.x - top.x, z.y - top.y);
                 // 圓形相交判定
                 if (dist <= cycloneRadius + z.radius) {
@@ -4390,7 +3891,6 @@ export class GameEngine {
                         if (isBoss) SoundSystem.play('SE-Explo1');
                         z.flashTimer = isBoss ? 0.35 : 0.15;
                         z.hitCooldown = isBoss ? 1.0 : 0.25;
-
                         // 每次氣旋攻擊到敵人時，扣減陀螺自己 1 點 HP (若非無敵狀態)
                         const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
                         if (!isInvulnerable) {
@@ -4398,7 +3898,6 @@ export class GameEngine {
                             top.visualHp = top.visualHp !== undefined ? Math.max(top.hp, top.visualHp) : top.hp;
                             top.hpLossTimer = 0.5;
                         }
-
                         // 產生對應殭屍代表色的衝擊粒子特效
                         const isBig = z.type === 'zombie_big' || z.type === 'zombie_bomb' || z.type === 'zombie_bouncing';
                         let mainColor = '#22c55e';
@@ -4411,14 +3910,11 @@ export class GameEngine {
                         } else if (z.type === 'zombie_bouncing') {
                             mainColor = '#be185d';
                         }
-                        
                         const angle = Math.atan2(z.y - top.y, z.x - top.x);
                         const contactX = top.x + Math.cos(angle) * top.radius;
                         const contactY = top.y + Math.sin(angle) * top.radius;
-
                         EffectSystem.addParticles(this, contactX, contactY, mainColor, 8, 160, 4);
                         EffectSystem.addParticles(this, contactX, contactY, '#ffffff', 4, 200, 3);
-
                         if (isBoss && !top.isAI) {
                             // 1. Add central star-shaped burst
                             this.particles.push({
@@ -4434,7 +3930,6 @@ export class GameEngine {
                                 angle: Math.random() * Math.PI * 2,
                                 rotationSpeed: (Math.random() - 0.5) * 3 * 1.5 // 50% faster rotation
                             });
-
                             // 2. Add radiating orange-yellow star sparks
                             const sparkCount = 6;
                             for (let i = 0; i < sparkCount; i++) {
@@ -4442,7 +3937,6 @@ export class GameEngine {
                                 const sparkSpeed = (150 + Math.random() * 180) * 1.5; // 50% faster flying speed
                                 const colors = ['#f97316', '#facc15', '#ea580c', '#eab308'];
                                 const chosenColor = colors[Math.floor(Math.random() * colors.length)];
-                                
                                 this.particles.push({
                                     x: contactX,
                                     y: contactY,
@@ -4458,7 +3952,6 @@ export class GameEngine {
                                 });
                             }
                         }
-
                         // 計算並處理殭屍死亡
                         if (z.hp <= 0) {
                             const isAlreadyDying = (z as any).isDying;
@@ -4470,7 +3963,6 @@ export class GameEngine {
                                     this.spawnTicket(z.x, z.y, z.type, idx);
                                 }
                                 top.kills = (top.kills ?? 0) + 1;
-
                                 // 觸發殭屍死亡時的擴大膨脹衝擊波
                                 this.shockwaves.push({
                                     x: z.x,
@@ -4490,30 +3982,25 @@ export class GameEngine {
                     }
                 }
             });
-
             // 2. 判定對其他玩家陀螺的攻擊 (如在 Versus 模式下)
             this.tops.forEach(otherTop => {
                 if (otherTop.id === top.id || otherTop.markForDeletion || otherTop.isExploding) return;
-
                 const dist = Math.hypot(otherTop.x - top.x, otherTop.y - top.y);
                 if (dist <= cycloneRadius + otherTop.radius) {
                     if ((otherTop.hitCooldown === undefined || otherTop.hitCooldown <= 0) &&
                         (otherTop.cycloneHitCooldown === undefined || otherTop.cycloneHitCooldown <= 0)) {
                         otherTop.hitCooldown = 1.0; // 1-second invulnerability protection
                         otherTop.cycloneHitCooldown = 0.25; // 限制受擊冷卻（每 0.25 秒只能扣 1 點）
-
                         // 產生炫麗的陀螺接觸電光摩擦粒子
                         const angle = Math.atan2(otherTop.y - top.y, otherTop.x - top.x);
                         const contactX = top.x + Math.cos(angle) * top.radius;
                         const contactY = top.y + Math.sin(angle) * top.radius;
-
                         EffectSystem.addParticles(this, contactX, contactY, top.color, 8, 160, 4);
                         EffectSystem.addParticles(this, contactX, contactY, '#ffffff', 4, 200, 3);
                     }
                 }
             });
         });
-
         // Update Zombies
         const allTopsAlive = this.tops.filter(t => !t.markForDeletion && !t.isExploding && t.hp > 0);
         const zombieTargets = allTopsAlive.filter(t => {
@@ -4522,7 +4009,6 @@ export class GameEngine {
             return !isClinging && !isOnLaunchPad;
         });
         updateZombies.call(this, dt, zombieTargets);
-
         // Check laser beam collisions for any active beams
         this.zombies.forEach(z => {
             if (z.markForDeletion) return;
@@ -4530,9 +4016,26 @@ export class GameEngine {
                 const boss = z as any;
                 const dirX = boss.bossDashDirectionX ?? 1;
                 const dirY = boss.bossDashDirectionY ?? 0;
+                // Calculate ±30 degrees directions
+                const angle30 = 30 * Math.PI / 180;
+                const cos30 = Math.cos(angle30);
+                const sin30 = Math.sin(angle30);
+                const directions = [
+                    { x: dirX, y: dirY }, // Original
+                    { x: dirX * cos30 - dirY * sin30, y: dirX * sin30 + dirY * cos30 }, // +30 deg
+                    { x: dirX * cos30 + dirY * sin30, y: -dirX * sin30 + dirY * cos30 } // -30 deg
+                ];
                 this.tops.forEach(top => {
                     if (top.markForDeletion || top.isExploding || (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0)) return;
-                    if (checkRayCircleCollision(boss.x, boss.y, dirX, dirY, top.x, top.y, top.radius || TOP_RADIUS, 128)) {
+                    // Check collision against any of the 3 beams
+                    let collided = false;
+                    for (const dir of directions) {
+                        if (checkRayCircleCollision(boss.x, boss.y, dir.x, dir.y, top.x, top.y, top.radius || TOP_RADIUS, 128)) {
+                            collided = true;
+                            break;
+                        }
+                    }
+                    if (collided) {
                         // Deal laser beam damage!
                         if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
                             const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
@@ -4540,8 +4043,7 @@ export class GameEngine {
                                 top.hitCooldown = 1.0; // 1 second protection
                                 top.flashTimer = 0.25;
                                 top.damageShockTimer = 0.45;
-                                top.hpLossTimer = 0.5;
-                                top.visualHp = top.visualHp !== undefined ? Math.max(top.hp, top.visualHp) : top.hp;
+                                top.spin = Math.max(10, (top.spin ?? 1000) - 300);
                                 EffectSystem.addParticles(this, top.x, top.y, '#ef4444', 35, 450, 10);
                             } else {
                                 EffectSystem.addParticles(this, top.x, top.y, '#fbbf24', 25, 300, 10);
@@ -4550,7 +4052,6 @@ export class GameEngine {
                         if (top.isAI) {
                             this.screenShakeTimer = 0.8;
                         }
-                        
                         // Push back
                         const dx = top.x - boss.x;
                         const dy = top.y - boss.y;
@@ -4558,10 +4059,8 @@ export class GameEngine {
                         const nx = dx / dist;
                         const ny = dy / dist;
                         const bounceForce = 1500;
-                        
                         top.vx = nx * bounceForce;
                         top.vy = ny * bounceForce;
-                        
                         if (top.state === 'dash') {
                             top.state = 'standby';
                             top.dashTimer = 0;
@@ -4600,7 +4099,6 @@ export class GameEngine {
                         if (top.isAI) {
                             this.screenShakeTimer = 0.5;
                         }
-                        
                         // Push back
                         const dx = top.x - big.x;
                         const dy = top.y - big.y;
@@ -4608,10 +4106,8 @@ export class GameEngine {
                         const nx = dx / dist;
                         const ny = dy / dist;
                         const bounceForce = 1100;
-                        
                         top.vx = nx * bounceForce;
                         top.vy = ny * bounceForce;
-                        
                         if (top.state === 'dash') {
                             top.state = 'standby';
                             top.dashTimer = 0;
@@ -4628,21 +4124,17 @@ export class GameEngine {
                 });
             }
         });
-        
         // --- PHYSICS & COLLISIONS ---
         const activeEntities = [...this.tops.filter(t => !t.isExploding), ...this.zombies.filter(z => !(z as any).isDying), ...this.obstacles, ...this.items].filter(e => !e.markForDeletion);
-        
         for (let i = 0; i < activeEntities.length; i++) {
             for (let j = i + 1; j < activeEntities.length; j++) {
                 const a = activeEntities[i];
                 const b = activeEntities[j];
-                
                 if (checkCollision(a, b)) {
                     CollisionSystem.handleCollision(this, a, b);
                 }
             }
         }
-
         // --- SPIKE OBSTACLES COLLISION ---
         const spikes = CollisionSystem.getSpikeTriangles(this);
         const collidableSpikeEntities = [...this.tops.filter(t => !t.isExploding), ...this.zombies.filter(z => !(z as any).isDying)].filter(e => {
@@ -4658,7 +4150,6 @@ export class GameEngine {
             }
             spikes.forEach(spike => {
                 if (spike.height <= 2) return; // Skip if spike is barely visible
-                
                 const res = resolveCircleTriangleCollision(
                     e as any,
                     spike.x1, spike.y1,
@@ -4666,37 +4157,30 @@ export class GameEngine {
                     spike.x3, spike.y3,
                     1.4 // highly bouncy spike rebounds!
                 );
-                
                 if (res && res.impactForce > 0) {
                     if (e.type === 'top') {
                         const top = e as Top;
-                        
                         // 2.玩家撞到場地尖刺機關時，不再受到傷害。
                         const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0) || top.hp <= 0;
                         if (!isInvulnerable && (top.hitCooldown === undefined || top.hitCooldown <= 0)) {
                             SoundSystem.play('SE-Hurt1');
                             top.hitCooldown = 1.0;
-                            
                             // Visual feedback for spike damage
                             this.screenShakeIntensity = 12;
                             this.screenShakeTimer = 0.5;
                         }
-
                         // Generates custom grey particles at the precise collision edge point
                         const cX = e.x - res.nx * e.radius;
                         const cY = e.y - res.ny * e.radius;
                         EffectSystem.addChainsawSparkParticles(this, cX, cY, res.nx, res.ny, 24, 1.0, top.spin);
-
                         // Apply exact ±15 deg random rotation modification to spike rebounds
                         const bounceAngle = (Math.random() < 0.5 ? 15 : -15) * Math.PI / 180;
                         const bCos = Math.cos(bounceAngle);
                         const bSin = Math.sin(bounceAngle);
-                        
                         const rx = top.vx * bCos - top.vy * bSin;
                         const ry = top.vx * bSin + top.vy * bCos;
                         top.vx = rx;
                         top.vy = ry;
-
                         if (top.state === 'dash') {
                             const dx = top.dashDirectionX ?? 0;
                             const dy = top.dashDirectionY ?? 0;
@@ -4710,7 +4194,6 @@ export class GameEngine {
                             const rDy = (top.dashDirectionX ?? 0) * bSin + (top.dashDirectionY ?? 0) * bCos;
                             top.dashDirectionX = rDx;
                             top.dashDirectionY = rDy;
-
                             // Reset velocity directly in the rebounded direction
                             top.vx = top.dashDirectionX * 1400;
                             top.vy = top.dashDirectionY * 1400;
@@ -4719,7 +4202,6 @@ export class GameEngine {
                 }
             });
         });
-
         // --- CONCRETE BLOCKS COLLISION ---
         // Decrement hit cooldowns for concrete blocks
         this.concreteBlocks.forEach(block => {
@@ -4731,7 +4213,6 @@ export class GameEngine {
                 block.flashTimer = Math.max(0, block.flashTimer - dt);
             }
         });
-
         const collidableEntities = [...this.tops.filter(t => !t.isExploding), ...this.zombies].filter(e => !e.markForDeletion);
         collidableEntities.forEach(e => {
             if (e.type === 'top' && (e as Top).launchPadState !== undefined) {
@@ -4773,36 +4254,30 @@ export class GameEngine {
                     return; // Skip standard concrete block collision resolution so Big Zombie charges through unaffected
                 }
             }
-
             this.concreteBlocks.forEach(block => {
                 const res = resolveCircleBoxCollision(e as any, block, 1.1); // Bouncy concrete rebounds
                 if (res) {
                     if (e.type === 'top') {
                         const top = e as Top;
                         const blockExtra = block as any;
-
                         // Apply exact ±15 deg random rotation modification to concrete block rebounds
                         const bounceAngle = (Math.random() < 0.5 ? 15 : -15) * Math.PI / 180;
                         const bCos = Math.cos(bounceAngle);
                         const bSin = Math.sin(bounceAngle);
-
                         const rx = top.vx * bCos - top.vy * bSin;
                         const ry = top.vx * bSin + top.vy * bCos;
                         top.vx = rx;
                         top.vy = ry;
-                        
                         // Decrement block durability on top collisions with cooldown protection
                         if (blockExtra.hitCooldown === undefined || blockExtra.hitCooldown <= 0) {
                             block.durability = (block.durability ?? 5) - 1;
                             block.flashTimer = 0.15; // Set flash timer to 150ms
                             blockExtra.hitCooldown = 0.25; // 250ms collision invulnerability window to prevent multi-hit overlapping
                             SoundSystem.play('SE-Sheild1');
-                            
                             // Visual impact effects (stone fragments / dust) - generated at the precise edge contact point
                             const cX = e.x - res.nx * e.radius;
                             const cY = e.y - res.ny * e.radius;
                             EffectSystem.addChainsawSparkParticles(this, cX, cY, res.nx, res.ny, 24, 1.0, top.spin);
-                            
                             if (block.durability <= 0) {
                                 block.markForDeletion = true;
                                 // Crumble explosion particles
@@ -4818,7 +4293,6 @@ export class GameEngine {
                                 EffectSystem.addChainsawSparkParticles(this, cX, cY, res.nx, res.ny, 12, 1.0, top.spin);
                             }
                         }
-                        
                         if (top.state === 'dash') {
                             const dx = top.dashDirectionX ?? 0;
                             const dy = top.dashDirectionY ?? 0;
@@ -4827,13 +4301,11 @@ export class GameEngine {
                                 top.dashDirectionX = dx - 2 * dotValue * res.nx;
                                 top.dashDirectionY = dy - 2 * dotValue * res.ny;
                             }
-
                             // Sync rotation of the reflected dash vector coordinates
                             const rDx = (top.dashDirectionX ?? 0) * bCos - (top.dashDirectionY ?? 0) * bSin;
                             const rDy = (top.dashDirectionX ?? 0) * bSin + (top.dashDirectionY ?? 0) * bCos;
                             top.dashDirectionX = rDx;
                             top.dashDirectionY = rDy;
-                            
                             // Reset velocity directly in the rebounded direction
                             top.vx = top.dashDirectionX * 1400;
                             top.vy = top.dashDirectionY * 1400;
@@ -4842,30 +4314,25 @@ export class GameEngine {
                 }
             });
         });
-        
         // Update afterimages
         this.afterimages.forEach(img => {
             img.life -= dt;
         });
         this.afterimages = this.afterimages.filter(img => img.life > 0);
-
         // Update slash lines
         this.slashLines.forEach(line => {
             line.life -= dt;
         });
         this.slashLines = this.slashLines.filter(line => line.life > 0);
-
         // Update expanding X-slashes
         this.xSlashes.forEach(slash => {
             slash.life -= dt;
             slash.size = Math.min(slash.maxSize, slash.size + slash.speed * dt);
         });
         this.xSlashes = this.xSlashes.filter(slash => slash.life > 0);
-
         // Update active projectiles
         EffectSystem.updateProjectiles(this, dt);
         this.updateBulletTops(dt, realDt);
-
         // Update particles
         this.particles.forEach(p => {
             if (p.isSpark) {
@@ -4887,7 +4354,6 @@ export class GameEngine {
             p.life -= dt;
         });
         this.particles = this.particles.filter(p => p.life > 0);
-
         // Update floating texts
         this.floatingTexts.forEach(ft => {
             const currentDt = (ft.style === "armed_acquired") ? realDt : dt;
@@ -4895,21 +4361,18 @@ export class GameEngine {
             ft.life -= currentDt;
         });
         this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
-
         // Update expanding shockwaves
         this.shockwaves.forEach(sw => {
             sw.radius += sw.speed * dt;
             sw.life -= dt;
         });
         this.shockwaves = this.shockwaves.filter(sw => sw.life > 0);
-        
         // Update obstacles (e.g. decrement flashTimer)
         this.obstacles.forEach(o => {
             if (o.flashTimer !== undefined && o.flashTimer > 0) {
                 o.flashTimer = Math.max(0, o.flashTimer - dt);
             }
         });
-
         // Update items
         this.items.forEach(item => {
             if (item.type === 'item_ticket' || item.type === 'item_key') {
@@ -4919,7 +4382,6 @@ export class GameEngine {
                     item.y += item.vy * dt;
                     item.vx *= 0.95;
                     item.vy *= 0.95;
-                    
                     if (item.z !== undefined && item.vz !== undefined) {
                         item.z += item.vz * dt;
                         item.vz -= 1200 * dt; // Gravity
@@ -4933,7 +4395,6 @@ export class GameEngine {
                     let targetY = CANVAS_H / 2;
                     const padding = 24;
                     const barW = 210;
-                    
                     if (item.targetPlayerId === 'ui_keys') {
                         // Target the key UI area (next to timer at top center)
                         const timerBoxW = 100; // approximate
@@ -4944,15 +4405,12 @@ export class GameEngine {
                     else if (item.targetPlayerId === 'top_1') { targetX = CANVAS_W - barW - padding + barW / 2; targetY = CANVAS_H - 130 + 50; }
                     else if (item.targetPlayerId === 'top_2') { targetX = padding + barW / 2; targetY = padding + 50; }
                     else if (item.targetPlayerId === 'top_3') { targetX = CANVAS_W - barW - padding + barW / 2; targetY = padding + 50; }
-
                     // Apply camera transform to UI targets
                     targetX = (targetX - CANVAS_W / 2) / this.camera.zoom + this.camera.x;
                     targetY = (targetY - CANVAS_H / 2) / this.camera.zoom + this.camera.y;
-
                     const dx = targetX - item.x;
                     const dy = targetY - item.y;
                     const dist = Math.hypot(dx, dy);
-
                     if (item.initialDist === undefined) {
                         item.initialDist = dist;
                     }
@@ -4962,13 +4420,11 @@ export class GameEngine {
                     } else {
                         item.scale = 0.1;
                     }
-
                     const speed = 1500;
                     if (dist < speed * dt) {
                         item.x = targetX;
                         item.y = targetY;
                         item.markForDeletion = true;
-                        
                         if (item.type === 'item_key') {
                             this.collectiveKeys = (this.collectiveKeys || 0) + 1;
                             SoundSystem.play('Sse_03');
@@ -4988,7 +4444,6 @@ export class GameEngine {
                 }
             }
         });
-        
         // Cleanup dead
         this.tops = this.tops.filter(t => !t.markForDeletion);
         this.zombies = this.zombies.filter(z => !z.markForDeletion);
@@ -5000,12 +4455,10 @@ export class GameEngine {
             }
         });
         this.concreteBlocks = this.concreteBlocks.filter(cb => !cb.markForDeletion);
-        
         // Dynamically calculate camera zoom/pan coordinates based on active tops
         let targetCenterX = CANVAS_W / 2;
         let targetCenterY = CANVAS_H / 2;
         let targetZoom = 1.0;
-
         if (!this.introActive && this.tops.length > 0) {
             let minX = Infinity, maxX = -Infinity;
             let minY = Infinity, maxY = -Infinity;
@@ -5023,27 +4476,21 @@ export class GameEngine {
                     maxY = Math.max(maxY, top.y);
                 }
             });
-            
             targetCenterX = (minX + maxX) / 2;
             targetCenterY = (minY + maxY) / 2;
-            
             // Padding limits to prevent the field of view from becoming too claustrophobic or fully standard
             const marginX = 450;
             const marginY = 280;
             const boxW = Math.max(maxX - minX + marginX, 1000);
             const boxH = Math.max(maxY - minY + marginY, 650);
-            
             const zoomX = CANVAS_W / boxW;
             const zoomY = CANVAS_H / boxH;
-            
             // Limit target zoom to keep action focused and clear (Zoom disabled: locked to 1.0)
             targetZoom = 1.0;
         }
-
         targetCenterX = CANVAS_W / 2;
         targetCenterY = this.activeArenaCenterY;
         targetZoom = 1.0;
-
         // Smooth linear interpolation for the camera movement (responsive lerping)
         // With smooth, wiggle-free orbital targets, we can use slightly snappier speeds for fast action
         const zoomSpeed = 1.5;
@@ -5051,25 +4498,19 @@ export class GameEngine {
         this.camera.zoom += (targetZoom - this.camera.zoom) * (1 - Math.exp(-zoomSpeed * dt));
         this.camera.x += (targetCenterX - this.camera.x) * (1 - Math.exp(-panSpeed * dt));
         this.camera.y += (targetCenterY - this.camera.y) * (1 - Math.exp(-panSpeed * dt));
-
         const anyPlayerOrbiting = this.tops.some(t => !t.isAI && t.isSpinning && t.hp > 0);
         SoundSystem.setOrbiting(anyPlayerOrbiting);
-
         this.checkWinCondition(dt);
     }
-    
-
     checkWinCondition(dt: number) {
         if (this.gameMode === 'campaign') {
             // we remove the fail condition where all human players are dead, just keep the game running.
         } else if (this.gameMode === 'versus') {
             if (!this.introActive && !this.versusEndActive) {
                 const aliveTops = this.tops.filter(t => !t.markForDeletion && !t.isExploding);
-                
                 if (aliveTops.length <= 1 || this.timeRemaining <= 0) {
                     this.versusEndActive = true;
                     this.versusEndTimer = 1.6;
-                    
                     if (aliveTops.length === 1) {
                         const survivor = aliveTops[0];
                         const matchIndex = survivor.id.match(/\d+/);
@@ -5082,11 +4523,9 @@ export class GameEngine {
             }
         }
     }
-    
     endGame(msg: string) {
         this.isGameOver = true;
         SoundSystem.setOrbiting(false);
         this.onGameOver(msg, this.participants);
     }
-
 }

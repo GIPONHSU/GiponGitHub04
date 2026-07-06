@@ -277,7 +277,17 @@ import { checkCircleBoxCollision, resolveCircleBoxCollision } from './physics';
 
         // All top models unified to execute Model 1's standard pristine circular orbit with dynamic expansion per user request
         const standbyRadius = getStandbyRadius(top, engine) * radiusFactor;
-        const currentRadius = isBreakout ? (standbyRadius + breakoutRadiusBonus) : (standbyRadius + (150 - standbyRadius) * (top.spinInputFactor ?? 0) + breakoutRadiusBonus);
+        let currentRadius = isBreakout ? (standbyRadius + breakoutRadiusBonus) : (standbyRadius + (150 - standbyRadius) * (top.spinInputFactor ?? 0) + breakoutRadiusBonus);
+
+        const isPinnedBySiege = engine.zombieSiegeActive && engine.siegeTargetPlayerId === top.id && (engine.siegeStatus === 'approaching' || engine.siegeStatus === 'clinging');
+        if (isPinnedBySiege) {
+            currentRadius = 0;
+            top.standbyCenterX = engine.siegeTargetStartX ?? top.standbyCenterX;
+            top.standbyCenterY = engine.siegeTargetStartY ?? top.standbyCenterY;
+            top.standbyCenterVx = 0;
+            top.standbyCenterVy = 0;
+            currentOrbitSpeed = 0;
+        }
 
         targetX = top.standbyCenterX + Math.cos(top.standbyAngle) * currentRadius;
         targetY = top.standbyCenterY + Math.sin(top.standbyAngle) * currentRadius;

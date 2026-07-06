@@ -284,11 +284,11 @@ export function drawArena(ctx: CanvasRenderingContext2D, engine: GameEngine) {
             const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.005);
             
             // Calculate alpha based on timer.
-            // Active for 5 seconds, disappears at 6 seconds.
-            // So from 5.0 to 6.0 seconds, alpha goes from 1.0 down to 0.0
+            // Active for 14 seconds, disappears at 15 seconds.
+            // So from 14.0 to 15.0 seconds, alpha goes from 1.0 down to 0.0
             let alpha = 1.0;
-            if (wz.timer > 5.0) {
-                alpha = Math.max(0, 1.0 - (wz.timer - 5.0));
+            if (wz.timer > 14.0) {
+                alpha = Math.max(0, 1.0 - (wz.timer - 14.0));
             }
             
             if (alpha > 0) {

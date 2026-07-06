@@ -16,6 +16,117 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
     if (z.type === 'zombie_boss') {
         const boss = z as any;
         
+        // Process sequential earthquake waves
+        if (boss.earthquakeWavesPending && boss.earthquakeWavesPending.length > 0) {
+            boss.earthquakeElapsed = (boss.earthquakeElapsed ?? 0) + dt;
+            const stillPending: any[] = [];
+            
+            boss.earthquakeWavesPending.forEach((wave: any) => {
+                if (boss.earthquakeElapsed >= wave.delay) {
+                    // Trigger this wave!
+                    
+                    // Create the actual expanding shockwave ring
+                    engine.shockwaves.push({
+                        x: boss.x,
+                        y: boss.y,
+                        radius: 10,
+                        maxRadius: wave.radius,
+                        speed: wave.speed,
+                        color: wave.color,
+                        thickness: wave.thickness,
+                        life: 0.4,
+                        maxLife: 0.4,
+                        isEarthquake: true
+                    });
+
+                    // Add a secondary white core shockwave if it is the first wave
+                    if (wave.radius === 350) {
+                        engine.shockwaves.push({
+                            x: boss.x,
+                            y: boss.y,
+                            radius: 5,
+                            maxRadius: 220,
+                            speed: 537,
+                            color: 'rgba(255, 255, 255, 0.95)',
+                            thickness: 35,
+                            life: 0.4,
+                            maxLife: 0.4
+                        });
+                    }
+
+                    // Highly detailed landing/impact particles corresponding to this wave's size!
+                    EffectSystem.addParticles(engine, boss.x, boss.y, wave.color, 25, wave.radius, 10);
+                    // Add some dirt/rubble particles
+                    if (Math.random() < 0.5) {
+                        EffectSystem.addParticles(engine, boss.x, boss.y, '#7c2d12', 15, wave.radius * 0.8, 8);
+                        EffectSystem.addParticles(engine, boss.x, boss.y, '#451a03', 15, wave.radius * 0.6, 6);
+                    }
+
+                    // Play impact/stomp sound
+                    SoundSystem.play('Attack_Punch_024');
+
+                    // Shake camera
+                    engine.screenShakeTimer = 0.6;
+                    engine.screenShakeIntensity = 10 + (wave.radius - 350) / 15; // grows more intense for larger rings!
+
+                    // Deal 10 damage to all players within this wave's radius
+                    engine.tops.forEach(top => {
+                        if (top.markForDeletion || top.isExploding || top.hp <= 0 || (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0)) return;
+                        const dist = Math.hypot(top.x - boss.x, top.y - boss.y);
+                        if (dist <= wave.radius) {
+                            if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
+                                const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
+                                if (!isInvulnerable) {
+                                    top.hitCooldown = 1.0; // 1-second invulnerability protection
+                                    top.flashTimer = 0.25;
+                                    top.damageShockTimer = 0.45;
+                                    top.spin = Math.max(10, (top.spin ?? 1000) - 300);
+
+                                    EffectSystem.addParticles(engine, top.x, top.y, '#ef4444', 35, 450, 10);
+                                } else {
+                                    EffectSystem.addParticles(engine, top.x, top.y, '#fbbf24', 25, 300, 10);
+                                }
+                            }
+
+                            if (top.isAI) {
+                                engine.screenShakeTimer = 0.8;
+                            }
+
+                            // Apply knockback
+                            const dx = top.x - boss.x;
+                            const dy = top.y - boss.y;
+                            const dist2 = Math.hypot(dx, dy) || 1;
+                            const nx = dx / dist2;
+                            const ny = dy / dist2;
+                            
+                            // Knockback force scales with wave radius
+                            const bounceForce = 1500 + (wave.radius - 350) * 1.5;
+
+                            top.vx = nx * bounceForce;
+                            top.vy = ny * bounceForce;
+
+                            if (top.state === 'dash') {
+                                top.state = 'standby';
+                                top.dashTimer = 0;
+                                const velocityAngle = Math.atan2(ny, nx);
+                                top.standbyAngle = velocityAngle + Math.PI / 2;
+                                top.standbyCenterX = top.x - Math.cos(top.standbyAngle) * getStandbyRadiusForModel(top, engine, top.standbyAngle);
+                                top.standbyCenterY = top.y - Math.sin(top.standbyAngle) * getStandbyRadiusForModel(top, engine, top.standbyAngle);
+                            }
+                            if (top.state === 'standby') {
+                                top.standbyCenterVx = nx * bounceForce;
+                                top.standbyCenterVy = ny * bounceForce;
+                            }
+                        }
+                    });
+                } else {
+                    stillPending.push(wave);
+                }
+            });
+
+            boss.earthquakeWavesPending = stillPending;
+        }
+
         // If the boss is in a deadlock standoff, update its timer and vibrate
         if (boss.deadlockTimer !== undefined && boss.deadlockTimer > 0) {
             boss.deadlockTimer = Math.max(0, boss.deadlockTimer - dt);
@@ -417,15 +528,15 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                         SoundSystem.play('SE-Explo1');
                         boss.flashTimer = 0.5;
                         
-                        // Player dashes forward triumphantly
-                        targetTop.vx = nx * 1800;
-                        targetTop.vy = ny * 1800;
-                        targetTop.dashDirectionX = nx;
-                        targetTop.dashDirectionY = ny;
-                        targetTop.state = 'dash';
-                        targetTop.dashTimer = 0.6;
-                        targetTop.maxDashDuration = 0.6;
-                        targetTop.struggleTriumphTimer = 0.6;
+                        // Player top is released into beautiful orbital standby spin alignment (rapid spin-around whip)
+                        targetTop.state = 'standby';
+                        targetTop.spin = 1000;
+                        if (targetTop.smoothSpin !== undefined) targetTop.smoothSpin = 1000;
+                        targetTop.standbyAngle = Math.random() * Math.PI * 2;
+                        targetTop.standbyCenterX = targetTop.x;
+                        targetTop.standbyCenterY = targetTop.y;
+                        targetTop.breakoutOrbitTimer = 1.0;
+                        targetTop.struggleTriumphTimer = 1.0;
                         
                         engine.shockwaves.push({
                             x: targetTop.x,
@@ -459,7 +570,7 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                         targetTop.zPos = 1;
                         targetTop.zVel = 1200;
                         
-                        targetTop.spin = 10; // 轉速扣減至最低
+                        targetTop.spin = Math.max(10, (targetTop.spin ?? 1000) - 300); // 扣減3格轉速
                         
                         if (targetTop.state === 'dash') {
                             targetTop.state = 'standby';
@@ -473,8 +584,6 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                         SoundSystem.play('SE-Hurt1');
                         targetTop.flashTimer = 0.35;
                         targetTop.damageShockTimer = 0.6;
-                        targetTop.hpLossTimer = 0.5;
-                        targetTop.visualHp = targetTop.visualHp !== undefined ? Math.max(targetTop.hp, targetTop.visualHp) : targetTop.hp;
                         
                         engine.shockwaves.push({
                             x: targetTop.x,
@@ -539,122 +648,14 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                 boss.vx = 0;
                 boss.vy = 0;
 
-                // Create multi-layered concentric spectacular shockwaves that expand fully past the 350px warning boundary
-                // Layer 1: Massive Outer Rose-Red Shock Ring (Max Radius: 420px)
-                engine.shockwaves.push({
-                    x: boss.x,
-                    y: boss.y,
-                    radius: 10,
-                    maxRadius: 420,
-                    speed: 1025, // Covers 410px in 0.4 seconds to reach 420px max radius
-                    color: 'rgba(244, 63, 94, 0.95)', // Rose Red energy ring
-                    thickness: 95,
-                    life: 0.4,
-                    maxLife: 0.4
-                });
-
-                // Layer 2: Middle Vibrant Fire-Orange Shock Ring (Max Radius: 360px)
-                engine.shockwaves.push({
-                    x: boss.x,
-                    y: boss.y,
-                    radius: 10,
-                    maxRadius: 360,
-                    speed: 875, // Covers 350px in 0.4 seconds to reach 360px max radius
-                    color: 'rgba(249, 115, 22, 0.9)', // Deep orange kinetic shock
-                    thickness: 75,
-                    life: 0.4,
-                    maxLife: 0.4
-                });
-
-                // Layer 3: Inner Auric-Golden Shock Ring (Max Radius: 300px)
-                engine.shockwaves.push({
-                    x: boss.x,
-                    y: boss.y,
-                    radius: 10,
-                    maxRadius: 300,
-                    speed: 725, // Covers 290px in 0.4 seconds to reach 300px max radius
-                    color: 'rgba(234, 179, 8, 0.85)', // Radiant solar gold
-                    thickness: 55,
-                    life: 0.4,
-                    maxLife: 0.4
-                });
-
-                // Layer 4: Concentrated Core White-Hot Shockwave (Max Radius: 220px)
-                engine.shockwaves.push({
-                    x: boss.x,
-                    y: boss.y,
-                    radius: 5,
-                    maxRadius: 220,
-                    speed: 537,
-                    color: 'rgba(255, 255, 255, 0.95)', // White core flash
-                    thickness: 35,
-                    life: 0.4,
-                    maxLife: 0.4
-                });
-
-                // Shake camera extremely intensely
-                engine.screenShakeTimer = 1.2;
-                engine.screenShakeIntensity = 15;
-                
-                SoundSystem.play('Attack_Punch_024');
-
-                // Highly detailed explosive landing particles (heavy, dramatic, multi-colored)
-                EffectSystem.addParticles(engine, boss.x, boss.y, '#f43f5e', 40, 480, 14); // Rose-red primary impact bloom
-                EffectSystem.addParticles(engine, boss.x, boss.y, '#ea580c', 35, 400, 10); // Secondary lava-orange bursts
-                EffectSystem.addParticles(engine, boss.x, boss.y, '#7c2d12', 30, 280, 12); // Large dirt/soil/rubble boulders
-                EffectSystem.addParticles(engine, boss.x, boss.y, '#451a03', 25, 220, 8);  // Dense dark brown heavy earth clumps
-                EffectSystem.addParticles(engine, boss.x, boss.y, '#fef08a', 25, 360, 6);  // Glittering yellow sparks
-                EffectSystem.addParticles(engine, boss.x, boss.y, '#ffffff', 20, 320, 5);  // Super hot white sparks
-
-                // Deal 10 damage to all players within 350px radius
-                engine.tops.forEach(top => {
-                    if (top.markForDeletion || top.isExploding || top.hp <= 0 || (top.skillActiveTimer !== undefined && top.skillActiveTimer > 0)) return;
-                    const dist = Math.hypot(top.x - boss.x, top.y - boss.y);
-                    if (dist <= 350) {
-                        if (top.hitCooldown === undefined || top.hitCooldown <= 0) {
-                            const isInvulnerable = (top.rainbowSuperTimer !== undefined && top.rainbowSuperTimer > 0) || (top.breakoutOrbitTimer !== undefined && top.breakoutOrbitTimer > 0);
-                            if (!isInvulnerable) {
-                                top.hitCooldown = 1.0; // 1-second invulnerability protection
-                                top.flashTimer = 0.25;
-                                top.damageShockTimer = 0.45;
-                                top.hpLossTimer = 0.5;
-                                top.visualHp = top.visualHp !== undefined ? Math.max(top.hp, top.visualHp) : top.hp;
-
-                                EffectSystem.addParticles(engine, top.x, top.y, '#ef4444', 35, 450, 10);
-                            } else {
-                                EffectSystem.addParticles(engine, top.x, top.y, '#fbbf24', 25, 300, 10);
-                            }
-                        }
-
-                        if (top.isAI) {
-                            engine.screenShakeTimer = 0.8;
-                        }
-
-                        // Apply extreme knockback
-                        const dx = top.x - boss.x;
-                        const dy = top.y - boss.y;
-                        const dist2 = Math.hypot(dx, dy) || 1;
-                        const nx = dx / dist2;
-                        const ny = dy / dist2;
-                        const bounceForce = 1850; // heavy kinetic impact rebound
-
-                        top.vx = nx * bounceForce;
-                        top.vy = ny * bounceForce;
-
-                        if (top.state === 'dash') {
-                            top.state = 'standby';
-                            top.dashTimer = 0;
-                            const velocityAngle = Math.atan2(ny, nx);
-                            top.standbyAngle = velocityAngle + Math.PI / 2;
-                            top.standbyCenterX = top.x - Math.cos(top.standbyAngle) * getStandbyRadiusForModel(top, this,  top.standbyAngle);
-                            top.standbyCenterY = top.y - Math.sin(top.standbyAngle) * getStandbyRadiusForModel(top, this,  top.standbyAngle);
-                        }
-                        if (top.state === 'standby') {
-                            top.standbyCenterVx = nx * bounceForce;
-                            top.standbyCenterVy = ny * bounceForce;
-                        }
-                    }
-                });
+                // Set up sequential earthquake waves
+                // Each wave is 20% larger than the previous one: 350px -> 420px (350 * 1.2) -> 504px (420 * 1.2)
+                boss.earthquakeWavesPending = [
+                    { radius: 350, delay: 0.0, color: 'rgba(234, 179, 8, 1.0)', thickness: 80, speed: 850 },
+                    { radius: 420, delay: 0.25, color: 'rgba(249, 115, 22, 1.0)', thickness: 100, speed: 1025 },
+                    { radius: 504, delay: 0.5, color: 'rgba(244, 63, 94, 1.0)', thickness: 120, speed: 1235 }
+                ];
+                boss.earthquakeElapsed = 0;
             }
         }
 
@@ -702,14 +703,27 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                 // Face direction of beam
                 boss.angle = Math.atan2(boss.bossDashDirectionY ?? 0, boss.bossDashDirectionX ?? 1) + Math.PI/2;
 
-                // Spawn spectacular glowing discharging fire particles along the laser beam
+                // Spawn spectacular glowing discharging fire particles along any of the 3 laser beams
                 if (Math.random() < 0.9) {
-                    const sparkDx = (boss.bossDashDirectionX ?? 1);
-                    const sparkDy = (boss.bossDashDirectionY ?? 0);
-                    const dist = 70 + Math.random() * 600; // spawn sparks along the boss laser line
+                    const dirX = boss.bossDashDirectionX ?? 1;
+                    const dirY = boss.bossDashDirectionY ?? 0;
+                    
+                    const angle30 = 30 * Math.PI / 180;
+                    const cos30 = Math.cos(angle30);
+                    const sin30 = Math.sin(angle30);
+                    
+                    const directions = [
+                        { x: dirX, y: dirY }, // Original
+                        { x: dirX * cos30 - dirY * sin30, y: dirX * sin30 + dirY * cos30 }, // +30 deg
+                        { x: dirX * cos30 + dirY * sin30, y: -dirX * sin30 + dirY * cos30 } // -30 deg
+                    ];
+                    
+                    // Choose one of the 3 directions at random
+                    const chosenDir = directions[Math.floor(Math.random() * directions.length)];
+                    const dist = 70 + Math.random() * 600; // spawn sparks along the chosen boss laser line
                     engine.particles.push({
-                        x: boss.x + sparkDx * dist + (Math.random() - 0.5) * 50,
-                        y: boss.y + sparkDy * dist + (Math.random() - 0.5) * 50,
+                        x: boss.x + chosenDir.x * dist + (Math.random() - 0.5) * 50,
+                        y: boss.y + chosenDir.y * dist + (Math.random() - 0.5) * 50,
                         vx: (Math.random() - 0.5) * 50,
                         vy: (Math.random() - 0.5) * 50,
                         life: 0.3,
@@ -749,7 +763,7 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                 const dx = targetTop.x - boss.x;
                 const dy = targetTop.y - boss.y;
                 const dist = Math.hypot(dx, dy) || 1;
-                const spd = 65; // moves slowly but menacingly
+                const spd = 130; // moves menacingly (doubled)
                 boss.vx = (dx / dist) * spd;
                 boss.vy = (dy / dist) * spd;
                 
@@ -766,7 +780,7 @@ export function updateBossZombie(engine: GameEngine, z: Zombie, dt: number, zomb
                 }
                 boss.wanderTimer -= dt;
                 
-                const spd = 40; // slow wander speed
+                const spd = 80; // wander speed (doubled)
                 boss.vx = Math.cos(boss.wanderAngle) * spd;
                 boss.vy = Math.sin(boss.wanderAngle) * spd;
                 
